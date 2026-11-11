@@ -10,6 +10,7 @@ enum class TriggerSetupShortcut {
     ASSISTANT,
     POWER,
     FINGERPRINT_GESTURE,
+    MOTION_COMBO,
     KEYBOARD,
     MOUSE,
     GAMEPAD,

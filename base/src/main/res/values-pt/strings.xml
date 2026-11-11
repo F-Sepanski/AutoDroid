@@ -1430,4 +1430,7 @@ Deixe em branco se alguma rede Wi-Fi precisar ser correspondida.</string>
     <string name="trigger_setup_input_method_choose_button">Escolha o teclado</string>
     <string name="trigger_setup_input_method_running_button">Em execução</string>
     <!-- Trigger Setup bottom sheet -->
+    <string name="trigger_discover_shortcut_motion_combo">Gesto de Movimento (Combo)</string>
+    <string name="action_gemini_prompt">Comando Gemini AI</string>
+    <string name="gemini_prompt_hint">Ex: Ligue as luzes do meu quarto</string>
 </resources>

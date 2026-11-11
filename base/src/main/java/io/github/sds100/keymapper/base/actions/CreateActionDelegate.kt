@@ -76,6 +76,7 @@ class CreateActionDelegate(
     var createNotificationActionBottomSheetState: CreateNotificationActionBottomSheetState?
         by mutableStateOf(null)
     var toastActionBottomSheetState: ToastActionBottomSheetState? by mutableStateOf(null)
+    var geminiPromptBottomSheetState: GeminiPromptBottomSheetState? by mutableStateOf(null)
     var stepMediaActionBottomSheetState: StepMediaActionBottomSheetState? by mutableStateOf(null)
     var brightnessStepActionState: BrightnessStepActionBottomSheetState? by mutableStateOf(null)
 
@@ -406,6 +407,18 @@ class CreateActionDelegate(
             duration = state.duration,
         )
         toastActionBottomSheetState = null
+        actionResult.update { action }
+    }
+
+    fun onGeminiPromptChange(prompt: String) {
+        geminiPromptBottomSheetState = geminiPromptBottomSheetState?.copy(prompt = prompt)
+    }
+
+    fun onDoneGeminiPromptClick() {
+        val state = geminiPromptBottomSheetState ?: return
+        val finalPrompt = state.prompt.ifBlank { "Ligue as luzes do meu quarto" }
+        val action = ActionData.GeminiPrompt(prompt = finalPrompt)
+        geminiPromptBottomSheetState = null
         actionResult.update { action }
     }
 
@@ -1408,7 +1421,10 @@ class CreateActionDelegate(
 
             ActionId.GEMINI_PROMPT -> {
                 val oldAction = oldData as? ActionData.GeminiPrompt
-                return oldAction ?: ActionData.GeminiPrompt(prompt = "")
+                geminiPromptBottomSheetState = GeminiPromptBottomSheetState(
+                    prompt = oldAction?.prompt ?: "",
+                )
+                return null
             }
         }
     }

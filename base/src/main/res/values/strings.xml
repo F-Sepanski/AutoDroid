@@ -2242,6 +2242,9 @@
     <string name="trigger_discover_shortcut_custom">Custom</string>
     <string name="trigger_discover_shortcut_notch">Notch</string>
     <string name="trigger_discover_shortcut_lock_screen">Lock screen</string>
+    <string name="trigger_discover_shortcut_motion_combo">Gesto de Movimento (Combo)</string>
+    <string name="action_gemini_prompt">Comando Gemini AI</string>
+    <string name="gemini_prompt_hint">Ex: Ligue as luzes do meu quarto</string>
 
     <string name="trigger_discover_promo_title">Upgrade your experience</string>
     <string name="trigger_discover_promo_description">Floating buttons are instant shortcuts in any app, game or on your lock screen. Your support keeps Key Mapper alive ❤️</string>

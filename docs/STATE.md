@@ -4,6 +4,7 @@
 Atualizado: 2026-11-11 · Base: develop@d81a43e38
 
 ## Entregue Recentemente (últimas 10)
+- 2026-11-11 `T-004` (`feat-ui-motion-and-gemini-picker`) — feat(ui): add native UI controls for motion combos and Gemini AI prompt configuration
 - 2026-11-11 `APK BUILD` — Build completo com sucesso do APK real: `app/build/outputs/apk/debug/keymapper-4.7.0-foss-debug.apk` (49.5 MB) com binários JNI/C++, Rust NDK arm64, Kotlin e Hilt.
 - 2026-11-11 `T-003` (`feat-motion-trigger-pipeline`) `d81a43e3` — feat(trigger): integrate MotionTriggerKey pipeline and reactive detection
 - 2026-11-11 `T-002` (`feat-gemini-action-integration`) `67d6cec4` — feat(gemini): integrate Gemini AI prompt action with API and Assistant fallback

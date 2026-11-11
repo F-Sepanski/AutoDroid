@@ -6,6 +6,7 @@ import io.github.sds100.keymapper.base.system.accessibility.FingerprintGestureTy
 import io.github.sds100.keymapper.base.vibration.VibrateEffect
 import io.github.sds100.keymapper.common.models.EvdevDeviceInfo
 import io.github.sds100.keymapper.system.inputevents.KeyEventUtils
+import io.github.sds100.keymapper.system.motion.MotionDirection
 
 /**
  * This extracts the core logic when configuring a trigger which makes it easier to write tests.
@@ -54,6 +55,22 @@ class ConfigTriggerDelegate {
         val triggerKey = FingerprintTriggerKey(type = type, clickType = clickType)
 
         return addTriggerKey(trigger, triggerKey)
+    }
+
+    fun addMotionTriggerKey(trigger: Trigger, directions: List<MotionDirection>): Trigger {
+        val clickType = when (trigger.mode) {
+            is TriggerMode.Parallel -> trigger.mode.clickType
+            TriggerMode.Sequence -> ClickType.SHORT_PRESS
+            TriggerMode.Undefined -> ClickType.SHORT_PRESS
+        }
+
+        val triggerKey = MotionTriggerKey(directions = directions, clickType = clickType)
+
+        return addTriggerKey(trigger, triggerKey)
+    }
+
+    fun addMotionTriggerKey(trigger: Trigger, key: MotionTriggerKey): Trigger {
+        return addTriggerKey(trigger, key)
     }
 
     /**

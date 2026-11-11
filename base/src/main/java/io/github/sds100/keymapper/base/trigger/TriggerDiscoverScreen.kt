@@ -38,6 +38,7 @@ import io.github.sds100.keymapper.base.compose.KeyMapperTheme
 import io.github.sds100.keymapper.base.compose.LocalCustomColorsPalette
 import io.github.sds100.keymapper.base.utils.ui.compose.icons.IndeterminateQuestionBox
 import io.github.sds100.keymapper.base.utils.ui.compose.icons.KeyMapperIcons
+import io.github.sds100.keymapper.base.utils.ui.compose.icons.MobileSensorHi
 import io.github.sds100.keymapper.base.utils.ui.compose.icons.ModeOffOn
 import io.github.sds100.keymapper.base.utils.ui.compose.icons.SportsEsports
 import io.github.sds100.keymapper.base.utils.ui.compose.icons.VoiceSelection
@@ -108,6 +109,14 @@ fun TriggerDiscoverScreen(
                         ),
                     )
                 }
+
+                add(
+                    TriggerShortcutUiState(
+                        TriggerSetupShortcut.MOTION_COMBO,
+                        stringResource(R.string.trigger_discover_shortcut_motion_combo),
+                        KeyMapperIcons.MobileSensorHi,
+                    ),
+                )
             },
             onShortcutClick = onShortcutClick,
         )

@@ -548,7 +548,7 @@ object ActionUtils {
         ActionId.TALKBACK_GESTURE -> R.string.action_talkback_gesture
         ActionId.SET_VARIABLE -> R.string.action_set_variable
         ActionId.MODIFY_VARIABLE -> R.string.action_modify_variable
-        ActionId.GEMINI_PROMPT -> R.string.action_open_assistant
+        ActionId.GEMINI_PROMPT -> R.string.action_gemini_prompt
     }
 
     @DrawableRes
@@ -1205,6 +1205,7 @@ fun ActionData.isEditable(): Boolean = when (this) {
     is ActionData.TalkBackGesture,
     is ActionData.SetVariable,
     is ActionData.ModifyVariable,
+    is ActionData.GeminiPrompt,
         -> true
 
     else -> false

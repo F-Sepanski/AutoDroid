@@ -2,14 +2,17 @@ package io.github.sds100.keymapper.base.trigger
 
 import android.os.Build
 import dagger.hilt.android.scopes.ViewModelScoped
+import io.github.sds100.keymapper.base.keymaps.ConfigKeyMapState
 import io.github.sds100.keymapper.base.onboarding.SetupAccessibilityServiceDelegate
 import io.github.sds100.keymapper.base.system.accessibility.FingerprintGestureType
 import io.github.sds100.keymapper.base.utils.ExpertModeStatus
 import io.github.sds100.keymapper.base.utils.navigation.NavDestination
 import io.github.sds100.keymapper.base.utils.navigation.NavigationProvider
 import io.github.sds100.keymapper.base.utils.navigation.navigate
+import io.github.sds100.keymapper.base.utils.ui.DialogModel
 import io.github.sds100.keymapper.base.utils.ui.DialogProvider
 import io.github.sds100.keymapper.base.utils.ui.ResourceProvider
+import io.github.sds100.keymapper.base.utils.ui.showDialog
 import io.github.sds100.keymapper.common.utils.AccessibilityServiceError
 import io.github.sds100.keymapper.common.utils.KMResult
 import io.github.sds100.keymapper.common.utils.onFailure
@@ -17,6 +20,7 @@ import io.github.sds100.keymapper.common.utils.onSuccess
 import io.github.sds100.keymapper.sysbridge.manager.SystemBridgeConnectionManager
 import io.github.sds100.keymapper.sysbridge.manager.SystemBridgeConnectionState
 import io.github.sds100.keymapper.system.accessibility.AccessibilityServiceState
+import io.github.sds100.keymapper.system.motion.MotionDirection
 import javax.inject.Inject
 import javax.inject.Named
 import kotlinx.coroutines.CoroutineScope
@@ -44,6 +48,7 @@ class TriggerSetupDelegateImpl @Inject constructor(
     val systemBridgeConnectionManager: SystemBridgeConnectionManager,
     val configTriggerUseCase: ConfigTriggerUseCase,
     val setupInputMethodUseCase: SetupInputMethodUseCase,
+    val configKeyMapState: ConfigKeyMapState,
     resourceProvider: ResourceProvider,
     dialogProvider: DialogProvider,
     navigationProvider: NavigationProvider,
@@ -52,6 +57,8 @@ class TriggerSetupDelegateImpl @Inject constructor(
     DialogProvider by dialogProvider,
     NavigationProvider by navigationProvider,
     SetupAccessibilityServiceDelegate by setupAccessibilityServiceDelegate {
+
+    private val configTriggerDelegate: ConfigTriggerDelegate = ConfigTriggerDelegate()
 
     private val currentSetupShortcut: MutableStateFlow<TriggerSetupShortcut?> =
         MutableStateFlow(null)
@@ -83,6 +90,7 @@ class TriggerSetupDelegateImpl @Inject constructor(
                     TriggerSetupShortcut.VOLUME -> buildSetupVolumeTriggerFlow()
                     TriggerSetupShortcut.POWER -> buildSetupPowerTriggerFlow()
                     TriggerSetupShortcut.FINGERPRINT_GESTURE -> buildSetupFingerprintGestureFlow()
+                    TriggerSetupShortcut.MOTION_COMBO -> flowOf(null)
                     TriggerSetupShortcut.KEYBOARD -> buildSetupKeyboardTriggerFlow()
                     TriggerSetupShortcut.MOUSE -> buildSetupMouseTriggerFlow()
                     TriggerSetupShortcut.GAMEPAD -> buildSetupGamepadTriggerFlow()
@@ -94,6 +102,10 @@ class TriggerSetupDelegateImpl @Inject constructor(
         }.stateIn(viewModelScope, SharingStarted.Lazily, null)
 
     override fun showTriggerSetup(shortcut: TriggerSetupShortcut, forceExpertMode: Boolean) {
+        if (shortcut == TriggerSetupShortcut.MOTION_COMBO) {
+            showMotionComboSelection()
+            return
+        }
         isExpertModeLocked.value = true
         this.forceExpertMode.value = forceExpertMode
         // If force pro mode is enabled, automatically check the screen off option
@@ -101,6 +113,30 @@ class TriggerSetupDelegateImpl @Inject constructor(
             isScreenOffChecked.value = true
         }
         currentSetupShortcut.value = shortcut
+    }
+
+    private fun showMotionComboSelection() {
+        viewModelScope.launch {
+            val items = listOf(
+                listOf(MotionDirection.UP, MotionDirection.UP, MotionDirection.BACKWARD) to
+                    "CIMA, CIMA, TRÁS (Lanterna)",
+                listOf(MotionDirection.UP, MotionDirection.DOWN, MotionDirection.FORWARD) to
+                    "CIMA, BAIXO, FRENTE (Gemini)",
+                listOf(MotionDirection.SHAKE) to
+                    "CHACOALHAR / SHAKE",
+            )
+            val selected = showDialog("pick_motion_combo", DialogModel.SingleChoice(items))
+            if (selected != null) {
+                onMotionComboSelected(selected)
+            }
+        }
+    }
+
+    override fun onMotionComboSelected(directions: List<MotionDirection>) {
+        configKeyMapState.update { keyMap ->
+            val newTrigger = configTriggerDelegate.addMotionTriggerKey(keyMap.trigger, directions)
+            keyMap.copy(trigger = newTrigger)
+        }
     }
 
     private fun buildSetupVolumeTriggerFlow(): Flow<TriggerSetupState> {
@@ -466,4 +502,5 @@ interface TriggerSetupDelegate {
     fun onGamepadButtonTypeSelected(type: TriggerSetupState.Gamepad.Type)
     fun onEnableImeClick()
     fun onChooseImeClick()
+    fun onMotionComboSelected(directions: List<MotionDirection>)
 }
