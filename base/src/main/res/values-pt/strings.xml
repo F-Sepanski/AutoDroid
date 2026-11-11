@@ -1433,4 +1433,22 @@ Deixe em branco se alguma rede Wi-Fi precisar ser correspondida.</string>
     <string name="trigger_discover_shortcut_motion_combo">Gesto de Movimento (Combo)</string>
     <string name="action_gemini_prompt">Comando Gemini AI</string>
     <string name="gemini_prompt_hint">Ex: Ligue as luzes do meu quarto</string>
+
+    <!-- Motion Studio strings -->
+    <string name="motion_studio_title">Estúdio de Movimento</string>
+    <string name="motion_studio_record_button">Gravar</string>
+    <string name="motion_studio_stop_button">Parar</string>
+    <string name="motion_studio_clear_button">Limpar</string>
+    <string name="motion_studio_train_button">Modo Treino</string>
+    <string name="motion_studio_debugger_button">Debugger</string>
+    <string name="motion_studio_save_button">Salvar Combo</string>
+    <string name="motion_studio_empty_sequence_hint">Toque em Gravar e movimente o celular para capturar gestos</string>
+    <string name="motion_studio_sensitivity_label">Sensibilidade (Limiar): %1$.1f m/s²</string>
+    <string name="motion_studio_padding_label">Amortecimento de Ruído: %1$.1f m/s²</string>
+    <string name="motion_studio_training_progress">Passo %1$d de %2$d</string>
+    <string name="motion_studio_training_success">Combo executado com sucesso!</string>
+    <string name="motion_studio_training_prompt">Execute o próximo gesto:</string>
+    <string name="motion_studio_debugger_telemetry">X: %1$.2f | Y: %2$.2f | Z: %3$.2f (|A|: %4$.2f)</string>
+    <string name="motion_studio_debugger_last_gesture">Último Gesto: %1$s</string>
+    <string name="motion_studio_debugger_header">Telemetria de Sensores e Log</string>
 </resources>

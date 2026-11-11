@@ -2,6 +2,7 @@ package io.github.sds100.keymapper.base.trigger
 
 import io.github.sds100.keymapper.base.system.accessibility.FingerprintGestureType
 import io.github.sds100.keymapper.base.utils.ExpertModeStatus
+import io.github.sds100.keymapper.system.motion.MotionDirection
 
 sealed class TriggerSetupState {
     data class Volume(
@@ -87,5 +88,17 @@ sealed class TriggerSetupState {
         val isAccessibilityServiceEnabled: Boolean,
         val areRequirementsMet: Boolean,
         val selectedType: FingerprintGestureType,
+    ) : TriggerSetupState()
+
+    data class MotionCombo(
+        val isAccessibilityServiceEnabled: Boolean,
+        val areRequirementsMet: Boolean,
+        val currentSequence: List<MotionDirection> = emptyList(),
+        val threshold: Float = 3.5f,
+        val noisePadding: Float = 0.5f,
+        val isRecording: Boolean = false,
+        val isTraining: Boolean = false,
+        val trainingCurrentStep: Int = 0,
+        val showDebugger: Boolean = false,
     ) : TriggerSetupState()
 }

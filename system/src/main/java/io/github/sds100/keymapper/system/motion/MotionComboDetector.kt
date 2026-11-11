@@ -21,6 +21,8 @@ interface MotionComboDetector {
      */
     fun reset()
 
+    fun setSensitivity(threshold: Float, noisePadding: Float)
+
     companion object {
         const val DEFAULT_THRESHOLD = 3.5f
         const val DEFAULT_DEBOUNCE_MS = 250L
@@ -30,14 +32,17 @@ interface MotionComboDetector {
             threshold: Float = DEFAULT_THRESHOLD,
             debounceMs: Long = DEFAULT_DEBOUNCE_MS,
             shakeWindowMs: Long = DEFAULT_SHAKE_WINDOW_MS,
-        ): MotionComboDetector = MotionComboDetectorImpl(threshold, debounceMs, shakeWindowMs)
+            noisePadding: Float = 0f,
+        ): MotionComboDetector =
+            MotionComboDetectorImpl(threshold, debounceMs, shakeWindowMs, noisePadding)
     }
 }
 
 class MotionComboDetectorImpl(
-    private val threshold: Float = MotionComboDetector.DEFAULT_THRESHOLD,
+    private var threshold: Float = MotionComboDetector.DEFAULT_THRESHOLD,
     private val debounceMs: Long = MotionComboDetector.DEFAULT_DEBOUNCE_MS,
     private val shakeWindowMs: Long = MotionComboDetector.DEFAULT_SHAKE_WINDOW_MS,
+    private var noisePadding: Float = 0f,
 ) : MotionComboDetector {
 
     @Inject
@@ -45,6 +50,7 @@ class MotionComboDetectorImpl(
         threshold = MotionComboDetector.DEFAULT_THRESHOLD,
         debounceMs = MotionComboDetector.DEFAULT_DEBOUNCE_MS,
         shakeWindowMs = MotionComboDetector.DEFAULT_SHAKE_WINDOW_MS,
+        noisePadding = 0f,
     )
 
     private enum class Axis { X, Y, Z }
@@ -56,13 +62,19 @@ class MotionComboDetectorImpl(
 
     private val gestureHistory = mutableListOf<MotionGesture>()
 
+    override fun setSensitivity(threshold: Float, noisePadding: Float) {
+        this.threshold = threshold
+        this.noisePadding = noisePadding
+    }
+
     override fun processSample(x: Float, y: Float, z: Float, timestampMs: Long): MotionDirection? {
         val absX = abs(x)
         val absY = abs(y)
         val absZ = abs(z)
         val maxVal = maxOf(absX, absY, absZ)
 
-        if (maxVal < threshold) {
+        val effectiveThreshold = threshold + noisePadding
+        if (maxVal < effectiveThreshold) {
             return null
         }
 

@@ -51,6 +51,7 @@ import io.github.sds100.keymapper.base.R
 import io.github.sds100.keymapper.base.compose.KeyMapperTheme
 import io.github.sds100.keymapper.base.compose.LocalCustomColorsPalette
 import io.github.sds100.keymapper.base.system.accessibility.FingerprintGestureType
+import io.github.sds100.keymapper.base.trigger.motion.MotionStudioBottomSheet
 import io.github.sds100.keymapper.base.utils.ExpertModeStatus
 import io.github.sds100.keymapper.base.utils.ui.compose.AccessibilityServiceRequirementRow
 import io.github.sds100.keymapper.base.utils.ui.compose.CheckBoxText
@@ -150,6 +151,21 @@ fun HandleTriggerSetupBottomSheet(delegate: TriggerSetupDelegate, sheetState: Sh
             onChooseInputMethodClick = delegate::onChooseImeClick,
             onUseExpertModeCheckedChange = delegate::onUseExpertModeCheckedChange,
             onEnableExpertModeClick = delegate::onEnableExpertModeClick,
+        )
+
+        is TriggerSetupState.MotionCombo -> MotionStudioBottomSheet(
+            sheetState = sheetState,
+            state = triggerSetupState as TriggerSetupState.MotionCombo,
+            telemetryFlow = delegate.motionTelemetry,
+            onDismissRequest = delegate::onDismissTriggerSetup,
+            onEnableAccessibilityServiceClick = delegate::onEnableAccessibilityServiceClick,
+            onStartRecording = delegate::onStartMotionRecording,
+            onStopRecording = delegate::onStopMotionRecording,
+            onClearSequence = delegate::onClearMotionSequence,
+            onSensitivityChanged = delegate::onMotionSensitivityChanged,
+            onToggleTraining = delegate::onToggleMotionTraining,
+            onToggleDebugger = delegate::onToggleMotionDebugger,
+            onSaveCombo = delegate::onSaveMotionCombo,
         )
 
         null -> {}

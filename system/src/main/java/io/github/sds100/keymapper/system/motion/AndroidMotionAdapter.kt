@@ -10,10 +10,14 @@ import dagger.hilt.android.qualifiers.ApplicationContext
 import javax.inject.Inject
 import javax.inject.Singleton
 import kotlin.math.abs
+import kotlin.math.sqrt
 import kotlinx.coroutines.channels.BufferOverflow
 import kotlinx.coroutines.flow.MutableSharedFlow
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharedFlow
+import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asSharedFlow
+import kotlinx.coroutines.flow.asStateFlow
 
 @Singleton
 class AndroidMotionAdapter @Inject constructor(
@@ -47,6 +51,9 @@ class AndroidMotionAdapter @Inject constructor(
     )
     override val triggeredCombos: SharedFlow<MotionCombo> = _triggeredCombos.asSharedFlow()
 
+    private val _telemetry = MutableStateFlow(MotionTelemetry())
+    override val telemetry: StateFlow<MotionTelemetry> = _telemetry.asStateFlow()
+
     private val registeredCombos = mutableListOf<MotionCombo>()
     private var listening: Boolean = false
     private var isSensorRegistered: Boolean = false
@@ -71,7 +78,19 @@ class AndroidMotionAdapter @Inject constructor(
             }
 
             val timestampMs = System.currentTimeMillis()
-            val direction = detector.processSample(x, y, z, timestampMs) ?: return
+            val magnitude = sqrt(x * x + y * y + z * z)
+            val direction = detector.processSample(x, y, z, timestampMs)
+
+            _telemetry.value = MotionTelemetry(
+                x = x,
+                y = y,
+                z = z,
+                magnitude = magnitude,
+                lastDirection = direction ?: _telemetry.value.lastDirection,
+                timestampMs = timestampMs,
+            )
+
+            if (direction == null) return
             val intensity = maxOf(abs(x), abs(y), abs(z))
             val gesture = MotionGesture(
                 direction = direction,
@@ -88,6 +107,10 @@ class AndroidMotionAdapter @Inject constructor(
         }
 
         override fun onAccuracyChanged(sensor: Sensor?, accuracy: Int) = Unit
+    }
+
+    override fun setSensitivity(threshold: Float, noisePadding: Float) {
+        detector.setSensitivity(threshold, noisePadding)
     }
 
     override fun registerCombos(combos: List<MotionCombo>) {
@@ -112,11 +135,12 @@ class AndroidMotionAdapter @Inject constructor(
             listening = false
             updateSensorStateLocked()
             detector.reset()
+            _telemetry.value = MotionTelemetry()
         }
     }
 
     private fun updateSensorStateLocked() {
-        val shouldListen = listening && registeredCombos.isNotEmpty()
+        val shouldListen = listening
         val manager = sensorManager ?: return
 
         if (shouldListen && !isSensorRegistered) {

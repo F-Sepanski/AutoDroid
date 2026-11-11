@@ -2394,4 +2394,22 @@
     <string name="select_group_by_intent_title">Select a group</string>
     <string name="select_group_by_intent_summary">Choose which group this intent controls</string>
 
+    <!-- Motion Studio strings -->
+    <string name="motion_studio_title">Motion Studio</string>
+    <string name="motion_studio_record_button">Record</string>
+    <string name="motion_studio_stop_button">Stop</string>
+    <string name="motion_studio_clear_button">Clear</string>
+    <string name="motion_studio_train_button">Train Mode</string>
+    <string name="motion_studio_debugger_button">Debugger</string>
+    <string name="motion_studio_save_button">Save Motion Combo</string>
+    <string name="motion_studio_empty_sequence_hint">Tap Record and move your phone to capture gestures</string>
+    <string name="motion_studio_sensitivity_label">Sensitivity (Threshold): %1$.1f m/s²</string>
+    <string name="motion_studio_padding_label">Noise Padding: %1$.1f m/s²</string>
+    <string name="motion_studio_training_progress">Step %1$d of %2$d</string>
+    <string name="motion_studio_training_success">Combo matched successfully!</string>
+    <string name="motion_studio_training_prompt">Perform next gesture:</string>
+    <string name="motion_studio_debugger_telemetry">X: %1$.2f | Y: %2$.2f | Z: %3$.2f (|A|: %4$.2f)</string>
+    <string name="motion_studio_debugger_last_gesture">Last Gesture: %1$s</string>
+    <string name="motion_studio_debugger_header">Sensor Telemetry &amp; Log</string>
+
 </resources>

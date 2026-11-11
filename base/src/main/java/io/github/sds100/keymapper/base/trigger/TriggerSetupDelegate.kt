@@ -9,10 +9,8 @@ import io.github.sds100.keymapper.base.utils.ExpertModeStatus
 import io.github.sds100.keymapper.base.utils.navigation.NavDestination
 import io.github.sds100.keymapper.base.utils.navigation.NavigationProvider
 import io.github.sds100.keymapper.base.utils.navigation.navigate
-import io.github.sds100.keymapper.base.utils.ui.DialogModel
 import io.github.sds100.keymapper.base.utils.ui.DialogProvider
 import io.github.sds100.keymapper.base.utils.ui.ResourceProvider
-import io.github.sds100.keymapper.base.utils.ui.showDialog
 import io.github.sds100.keymapper.common.utils.AccessibilityServiceError
 import io.github.sds100.keymapper.common.utils.KMResult
 import io.github.sds100.keymapper.common.utils.onFailure
@@ -20,7 +18,10 @@ import io.github.sds100.keymapper.common.utils.onSuccess
 import io.github.sds100.keymapper.sysbridge.manager.SystemBridgeConnectionManager
 import io.github.sds100.keymapper.sysbridge.manager.SystemBridgeConnectionState
 import io.github.sds100.keymapper.system.accessibility.AccessibilityServiceState
+import io.github.sds100.keymapper.system.motion.MotionAdapter
+import io.github.sds100.keymapper.system.motion.MotionComboDetector
 import io.github.sds100.keymapper.system.motion.MotionDirection
+import io.github.sds100.keymapper.system.motion.MotionTelemetry
 import javax.inject.Inject
 import javax.inject.Named
 import kotlinx.coroutines.CoroutineScope
@@ -52,6 +53,7 @@ class TriggerSetupDelegateImpl @Inject constructor(
     resourceProvider: ResourceProvider,
     dialogProvider: DialogProvider,
     navigationProvider: NavigationProvider,
+    val motionAdapter: MotionAdapter,
 ) : TriggerSetupDelegate,
     ResourceProvider by resourceProvider,
     DialogProvider by dialogProvider,
@@ -66,6 +68,35 @@ class TriggerSetupDelegateImpl @Inject constructor(
     private val isScreenOffChecked: MutableStateFlow<Boolean> = MutableStateFlow(false)
     private val isExpertModeLocked: MutableStateFlow<Boolean> = MutableStateFlow(false)
     private val forceExpertMode: MutableStateFlow<Boolean> = MutableStateFlow(false)
+
+    private val motionCurrentSequence = MutableStateFlow<List<MotionDirection>>(emptyList())
+    private val motionThreshold = MutableStateFlow(MotionComboDetector.DEFAULT_THRESHOLD)
+    private val motionNoisePadding = MutableStateFlow(0.5f)
+    private val isMotionRecording = MutableStateFlow(false)
+    private val isMotionTraining = MutableStateFlow(false)
+    private val motionTrainingCurrentStep = MutableStateFlow(0)
+    private val isMotionDebuggerVisible = MutableStateFlow(false)
+
+    override val motionTelemetry: StateFlow<MotionTelemetry> = motionAdapter.telemetry
+
+    init {
+        viewModelScope.launch {
+            motionAdapter.gestures.collect { gesture ->
+                if (currentSetupShortcut.value == TriggerSetupShortcut.MOTION_COMBO) {
+                    if (isMotionRecording.value) {
+                        motionCurrentSequence.value =
+                            motionCurrentSequence.value + gesture.direction
+                    } else if (isMotionTraining.value) {
+                        val seq = motionCurrentSequence.value
+                        val step = motionTrainingCurrentStep.value
+                        if (step < seq.size && gesture.direction == seq[step]) {
+                            motionTrainingCurrentStep.value = step + 1
+                        }
+                    }
+                }
+            }
+        }
+    }
 
     private val selectedFingerprintGestureType: MutableStateFlow<FingerprintGestureType> =
         MutableStateFlow(FingerprintGestureType.SWIPE_DOWN)
@@ -90,7 +121,7 @@ class TriggerSetupDelegateImpl @Inject constructor(
                     TriggerSetupShortcut.VOLUME -> buildSetupVolumeTriggerFlow()
                     TriggerSetupShortcut.POWER -> buildSetupPowerTriggerFlow()
                     TriggerSetupShortcut.FINGERPRINT_GESTURE -> buildSetupFingerprintGestureFlow()
-                    TriggerSetupShortcut.MOTION_COMBO -> flowOf(null)
+                    TriggerSetupShortcut.MOTION_COMBO -> buildSetupMotionComboFlow()
                     TriggerSetupShortcut.KEYBOARD -> buildSetupKeyboardTriggerFlow()
                     TriggerSetupShortcut.MOUSE -> buildSetupMouseTriggerFlow()
                     TriggerSetupShortcut.GAMEPAD -> buildSetupGamepadTriggerFlow()
@@ -103,7 +134,13 @@ class TriggerSetupDelegateImpl @Inject constructor(
 
     override fun showTriggerSetup(shortcut: TriggerSetupShortcut, forceExpertMode: Boolean) {
         if (shortcut == TriggerSetupShortcut.MOTION_COMBO) {
-            showMotionComboSelection()
+            currentSetupShortcut.value = shortcut
+            motionCurrentSequence.value = emptyList()
+            isMotionRecording.value = false
+            isMotionTraining.value = false
+            motionTrainingCurrentStep.value = 0
+            motionAdapter.setSensitivity(motionThreshold.value, motionNoisePadding.value)
+            motionAdapter.startListening()
             return
         }
         isExpertModeLocked.value = true
@@ -115,27 +152,47 @@ class TriggerSetupDelegateImpl @Inject constructor(
         currentSetupShortcut.value = shortcut
     }
 
-    private fun showMotionComboSelection() {
-        viewModelScope.launch {
-            val items = listOf(
-                listOf(MotionDirection.UP, MotionDirection.UP, MotionDirection.BACKWARD) to
-                    "CIMA, CIMA, TRÁS (Lanterna)",
-                listOf(MotionDirection.UP, MotionDirection.DOWN, MotionDirection.FORWARD) to
-                    "CIMA, BAIXO, FRENTE (Gemini)",
-                listOf(MotionDirection.SHAKE) to
-                    "CHACOALHAR / SHAKE",
-            )
-            val selected = showDialog("pick_motion_combo", DialogModel.SingleChoice(items))
-            if (selected != null) {
-                onMotionComboSelected(selected)
-            }
-        }
-    }
-
     override fun onMotionComboSelected(directions: List<MotionDirection>) {
         configKeyMapState.update { keyMap ->
             val newTrigger = configTriggerDelegate.addMotionTriggerKey(keyMap.trigger, directions)
             keyMap.copy(trigger = newTrigger)
+        }
+    }
+
+    private fun buildSetupMotionComboFlow(): Flow<TriggerSetupState> {
+        return combine(
+            accessibilityServiceState,
+            motionCurrentSequence,
+            motionThreshold,
+            motionNoisePadding,
+            isMotionRecording,
+            isMotionTraining,
+            motionTrainingCurrentStep,
+            isMotionDebuggerVisible,
+        ) { args: Array<Any?> ->
+            val serviceState = args[0] as AccessibilityServiceState
+
+            @Suppress("UNCHECKED_CAST")
+            val sequence = args[1] as List<MotionDirection>
+            val threshold = args[2] as Float
+            val padding = args[3] as Float
+            val recording = args[4] as Boolean
+            val training = args[5] as Boolean
+            val step = args[6] as Int
+            val showDebugger = args[7] as Boolean
+
+            val isServiceEnabled = serviceState == AccessibilityServiceState.ENABLED
+            TriggerSetupState.MotionCombo(
+                isAccessibilityServiceEnabled = isServiceEnabled,
+                areRequirementsMet = isServiceEnabled,
+                currentSequence = sequence,
+                threshold = threshold,
+                noisePadding = padding,
+                isRecording = recording,
+                isTraining = training,
+                trainingCurrentStep = step,
+                showDebugger = showDebugger,
+            )
         }
     }
 
@@ -406,7 +463,58 @@ class TriggerSetupDelegateImpl @Inject constructor(
     }
 
     override fun onDismissTriggerSetup() {
+        if (currentSetupShortcut.value == TriggerSetupShortcut.MOTION_COMBO) {
+            motionAdapter.stopListening()
+            isMotionRecording.value = false
+            isMotionTraining.value = false
+            motionTrainingCurrentStep.value = 0
+        }
         currentSetupShortcut.value = null
+    }
+
+    override fun onStartMotionRecording() {
+        motionCurrentSequence.value = emptyList()
+        isMotionRecording.value = true
+        isMotionTraining.value = false
+        motionTrainingCurrentStep.value = 0
+        motionAdapter.startListening()
+    }
+
+    override fun onStopMotionRecording() {
+        isMotionRecording.value = false
+    }
+
+    override fun onClearMotionSequence() {
+        motionCurrentSequence.value = emptyList()
+        motionTrainingCurrentStep.value = 0
+    }
+
+    override fun onMotionSensitivityChanged(threshold: Float, noisePadding: Float) {
+        motionThreshold.value = threshold
+        motionNoisePadding.value = noisePadding
+        motionAdapter.setSensitivity(threshold, noisePadding)
+    }
+
+    override fun onToggleMotionTraining() {
+        val next = !isMotionTraining.value
+        isMotionTraining.value = next
+        if (next) {
+            isMotionRecording.value = false
+            motionTrainingCurrentStep.value = 0
+            motionAdapter.startListening()
+        }
+    }
+
+    override fun onToggleMotionDebugger() {
+        isMotionDebuggerVisible.value = !isMotionDebuggerVisible.value
+    }
+
+    override fun onSaveMotionCombo() {
+        val sequence = motionCurrentSequence.value
+        if (sequence.isNotEmpty()) {
+            onMotionComboSelected(sequence)
+        }
+        onDismissTriggerSetup()
     }
 
     override fun onTriggerSetupRecordClick() {
@@ -420,6 +528,8 @@ class TriggerSetupDelegateImpl @Inject constructor(
             is TriggerSetupState.Power -> true
 
             is TriggerSetupState.FingerprintGesture -> false
+
+            is TriggerSetupState.MotionCombo -> false
 
             is TriggerSetupState.Mouse -> true
 
@@ -490,6 +600,7 @@ class TriggerSetupDelegateImpl @Inject constructor(
 
 interface TriggerSetupDelegate {
     val triggerSetupState: StateFlow<TriggerSetupState?>
+    val motionTelemetry: StateFlow<MotionTelemetry>
     fun showTriggerSetup(shortcut: TriggerSetupShortcut, forceExpertMode: Boolean = false)
     fun onDismissTriggerSetup()
     fun onEnableAccessibilityServiceClick()
@@ -503,4 +614,11 @@ interface TriggerSetupDelegate {
     fun onEnableImeClick()
     fun onChooseImeClick()
     fun onMotionComboSelected(directions: List<MotionDirection>)
+    fun onStartMotionRecording()
+    fun onStopMotionRecording()
+    fun onClearMotionSequence()
+    fun onMotionSensitivityChanged(threshold: Float, noisePadding: Float)
+    fun onToggleMotionTraining()
+    fun onToggleMotionDebugger()
+    fun onSaveMotionCombo()
 }
