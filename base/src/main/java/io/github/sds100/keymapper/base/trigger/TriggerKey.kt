@@ -17,6 +17,7 @@ sealed class TriggerKey : Comparable<TriggerKey> {
         is FloatingButtonKey -> copy(clickType = clickType)
         is FingerprintTriggerKey -> copy(clickType = clickType)
         is EvdevTriggerKey -> copy(clickType = clickType)
+        is MotionTriggerKey -> copy(clickType = clickType)
     }
 
     override fun compareTo(other: TriggerKey) = this.javaClass.name.compareTo(other.javaClass.name)
@@ -43,6 +44,10 @@ sealed class TriggerKey : Comparable<TriggerKey> {
 
             this is FloatingButtonKey && other is FloatingButtonKey -> {
                 return this.buttonUid == other.buttonUid
+            }
+
+            this is MotionTriggerKey && other is MotionTriggerKey -> {
+                return this.directions == other.directions
             }
         }
 

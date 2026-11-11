@@ -74,7 +74,7 @@ private fun validateParallelTrigger(trigger: Trigger): Trigger {
         newKeys = trigger.keys.distinctBy { key ->
             when (key) {
                 // You can't mix assistant trigger types in a parallel trigger because there is no notion of a "down" key event, which means they can't be pressed at the same time
-                is AssistantTriggerKey, is FingerprintTriggerKey -> 0
+                is AssistantTriggerKey, is FingerprintTriggerKey, is MotionTriggerKey -> 0
                 is FloatingButtonKey -> key.buttonUid
 
                 is KeyEventTriggerKey -> {

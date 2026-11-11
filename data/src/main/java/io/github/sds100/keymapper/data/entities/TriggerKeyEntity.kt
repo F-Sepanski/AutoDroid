@@ -39,6 +39,7 @@ sealed class TriggerKeyEntity : Parcelable {
                 is EvdevTriggerKeyEntity -> Gson().toJsonTree(key)
                 is FloatingButtonKeyEntity -> Gson().toJsonTree(key)
                 is FingerprintTriggerKeyEntity -> Gson().toJsonTree(key)
+                is MotionTriggerKeyEntity -> Gson().toJsonTree(key)
             }
         }
 
@@ -59,6 +60,10 @@ sealed class TriggerKeyEntity : Parcelable {
 
                     json.obj.has(FingerprintTriggerKeyEntity.NAME_FINGERPRINT_GESTURE_TYPE) -> {
                         return@jsonDeserializer deserializeFingerprintTriggerKey(json, uid!!)
+                    }
+
+                    json.obj.has(MotionTriggerKeyEntity.NAME_DIRECTIONS) -> {
+                        return@jsonDeserializer deserializeMotionTriggerKey(json, uid!!)
                     }
 
                     json.obj.has(EvdevTriggerKeyEntity.NAME_DEVICE_PRODUCT) -> {
@@ -99,6 +104,17 @@ sealed class TriggerKeyEntity : Parcelable {
             val clickType by json.byInt(NAME_CLICK_TYPE)
 
             return FingerprintTriggerKeyEntity(type, clickType, uid)
+        }
+
+        private fun deserializeMotionTriggerKey(
+            json: JsonElement,
+            uid: String,
+        ): MotionTriggerKeyEntity {
+            val directionsArray = json.obj.getAsJsonArray(MotionTriggerKeyEntity.NAME_DIRECTIONS)
+            val directions = directionsArray?.map { it.asString } ?: emptyList()
+            val clickType by json.byInt(NAME_CLICK_TYPE)
+
+            return MotionTriggerKeyEntity(directions, clickType, uid)
         }
 
         private fun deserializeEvdevTriggerKey(

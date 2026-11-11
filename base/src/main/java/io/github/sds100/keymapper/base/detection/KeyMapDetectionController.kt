@@ -6,10 +6,12 @@ import io.github.sds100.keymapper.base.constraints.DetectConstraintsUseCase
 import io.github.sds100.keymapper.base.input.InputEventDetectionSource
 import io.github.sds100.keymapper.base.input.InputEventHub
 import io.github.sds100.keymapper.base.input.InputEventHubCallback
+import io.github.sds100.keymapper.base.keymaps.KeyMap
 import io.github.sds100.keymapper.base.keymaps.PauseKeyMapsUseCase
 import io.github.sds100.keymapper.base.system.accessibility.FingerprintGestureType
 import io.github.sds100.keymapper.base.trigger.AssistantTriggerType
 import io.github.sds100.keymapper.base.trigger.EvdevTriggerKey
+import io.github.sds100.keymapper.base.trigger.MotionTriggerKey
 import io.github.sds100.keymapper.base.trigger.RecordTriggerController
 import io.github.sds100.keymapper.base.trigger.RecordTriggerState
 import io.github.sds100.keymapper.common.models.EvdevDeviceInfo
@@ -19,6 +21,8 @@ import io.github.sds100.keymapper.data.PreferenceDefaults
 import io.github.sds100.keymapper.data.repositories.PreferenceRepository
 import io.github.sds100.keymapper.system.inputevents.KMEvdevEvent
 import io.github.sds100.keymapper.system.inputevents.KMInputEvent
+import io.github.sds100.keymapper.system.motion.MotionAdapter
+import io.github.sds100.keymapper.system.motion.MotionCombo
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -38,6 +42,7 @@ class KeyMapDetectionController(
     private val pauseKeyMapsUseCase: PauseKeyMapsUseCase,
     private val recordTriggerController: RecordTriggerController,
     private val preferences: PreferenceRepository,
+    val motionAdapter: MotionAdapter? = null,
 ) : InputEventHubCallback {
     companion object {
         private const val INPUT_EVENT_HUB_ID = "key_map_controller"
@@ -98,6 +103,15 @@ class KeyMapDetectionController(
     private val isPaused: StateFlow<Boolean> =
         pauseKeyMapsUseCase.isPaused.stateIn(coroutineScope, SharingStarted.Eagerly, false)
 
+    private var activeKeyMaps: List<DetectKeyMapModel> = emptyList()
+
+    private val simpleMappingController = object : SimpleMappingController(
+        coroutineScope,
+        detectUseCase,
+        performActionsUseCase,
+        detectConstraints,
+    ) {}
+
     init {
         // Must first register before collecting anything that may change the grabbed
         // evdev devices.
@@ -108,14 +122,26 @@ class KeyMapDetectionController(
                 invalidateState(keyMapList, isPaused)
             }.launchIn(coroutineScope)
         }
+
+        if (motionAdapter != null) {
+            coroutineScope.launch {
+                motionAdapter.triggeredCombos.collect { combo ->
+                    onMotionCombo(combo.id)
+                }
+            }
+        }
     }
 
     private fun invalidateState(keyMapList: List<DetectKeyMapModel>, isPaused: Boolean) {
+        activeKeyMaps = keyMapList
         algorithm.reset()
+        simpleMappingController.reset()
 
         if (isPaused) {
             algorithm.loadKeyMaps(emptyList())
             inputEventHub.setGrabTargets(INPUT_EVENT_HUB_ID, emptyList())
+            motionAdapter?.registerCombos(emptyList())
+            motionAdapter?.stopListening()
         } else {
             algorithm.loadKeyMaps(keyMapList)
             // Determine which evdev devices need to be grabbed depending on the state
@@ -131,6 +157,26 @@ class KeyMapDetectionController(
                 INPUT_EVENT_HUB_ID,
                 grabRequests,
             )
+
+            val motionCombos = keyMapList.asSequence()
+                .filter { it.keyMap.isEnabled }
+                .flatMap { model ->
+                    model.keyMap.trigger.keys.filterIsInstance<MotionTriggerKey>().map { key ->
+                        MotionCombo(
+                            id = model.keyMap.uid,
+                            sequence = key.directions,
+                        )
+                    }
+                }
+                .filter { it.sequence.isNotEmpty() }
+                .toList()
+
+            motionAdapter?.registerCombos(motionCombos)
+            if (motionCombos.isNotEmpty()) {
+                motionAdapter?.startListening()
+            } else {
+                motionAdapter?.stopListening()
+            }
         }
     }
 
@@ -165,8 +211,34 @@ class KeyMapDetectionController(
         algorithm.onAssistantEvent(event)
     }
 
+    fun onMotionCombo(comboId: String) {
+        if (isPaused.value) {
+            return
+        }
+
+        if (recordTriggerController.state.value is RecordTriggerState.CountingDown) {
+            return
+        }
+
+        val matchingKeyMaps = activeKeyMaps.map { it.keyMap }.filter { keyMap ->
+            keyMap.uid == comboId ||
+                keyMap.trigger.keys.filterIsInstance<MotionTriggerKey>().any { it.uid == comboId }
+        }
+
+        for (keyMap in matchingKeyMaps) {
+            onKeyMapTriggered(keyMap)
+        }
+    }
+
+    fun onKeyMapTriggered(keyMap: KeyMap) {
+        simpleMappingController.onDetected(keyMap)
+    }
+
     fun teardown() {
         algorithm.reset()
+        simpleMappingController.reset()
+        motionAdapter?.stopListening()
+        motionAdapter?.registerCombos(emptyList())
         inputEventHub.setGrabTargets(INPUT_EVENT_HUB_ID, emptyList())
         inputEventHub.unregisterClient(INPUT_EVENT_HUB_ID)
     }

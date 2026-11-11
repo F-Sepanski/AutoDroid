@@ -30,6 +30,8 @@ class TriggerUiHelper(resourceProvider: ResourceProvider) : ResourceProvider by 
                 is FingerprintTriggerKey -> fingerprintKeyName(key)
 
                 is EvdevTriggerKey -> evdevTriggerKeyName(key)
+
+                is MotionTriggerKey -> motionTriggerKeyName(key)
             }
         }
 
@@ -193,6 +195,21 @@ class TriggerUiHelper(resourceProvider: ResourceProvider) : ResourceProvider by 
             FingerprintGestureType.SWIPE_RIGHT -> append(
                 getString(R.string.trigger_key_fingerprint_gesture_right),
             )
+        }
+    }
+
+    private fun motionTriggerKeyName(key: MotionTriggerKey): String = buildString {
+        when (key.clickType) {
+            ClickType.LONG_PRESS -> append(longPressString).append(" ")
+            ClickType.DOUBLE_PRESS -> append(doublePressString).append(" ")
+            else -> Unit
+        }
+
+        if (key.directions.isEmpty()) {
+            append("Motion Combo")
+        } else {
+            append("Motion: ")
+            append(key.directions.joinToString(" ") { it.name })
         }
     }
 

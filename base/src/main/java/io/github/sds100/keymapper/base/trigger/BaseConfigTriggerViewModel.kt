@@ -357,6 +357,10 @@ abstract class BaseConfigTriggerViewModel(
                             isScanCodeSettingEnabled = key.isScanCodeDetectionUserConfigurable(),
                         )
                     }
+
+                    is MotionTriggerKey -> {
+                        return null
+                    }
                 }
             }
         }
@@ -663,6 +667,19 @@ abstract class BaseConfigTriggerViewModel(
                     keyName = key.getCodeLabel(this),
                     clickType = clickType,
                     extraInfo = getEvdevTriggerKeyExtraInfo(key),
+                    linkType = linkType,
+                    error = error,
+                )
+
+                is MotionTriggerKey -> TriggerKeyListItemModel.KeyEvent(
+                    id = key.uid,
+                    keyName = if (key.directions.isEmpty()) {
+                        "Motion Combo"
+                    } else {
+                        "Motion: " + key.directions.joinToString(" ") { it.name }
+                    },
+                    clickType = clickType,
+                    extraInfo = null,
                     linkType = linkType,
                     error = error,
                 )

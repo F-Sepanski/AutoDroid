@@ -20,6 +20,7 @@ import io.github.sds100.keymapper.data.entities.FingerprintTriggerKeyEntity
 import io.github.sds100.keymapper.data.entities.FloatingButtonKeyEntity
 import io.github.sds100.keymapper.data.entities.KeyEventTriggerKeyEntity
 import io.github.sds100.keymapper.data.entities.KeyMapEntity
+import io.github.sds100.keymapper.data.entities.MotionTriggerKeyEntity
 import io.github.sds100.keymapper.data.repositories.FloatingButtonRepository
 import io.github.sds100.keymapper.data.repositories.FloatingLayoutRepository
 import io.github.sds100.keymapper.data.repositories.KeyMapRepository
@@ -70,6 +71,7 @@ class ConfigTriggerUseCaseImpl @Inject constructor(
                             is AssistantTriggerKeyEntity,
                             is FingerprintTriggerKeyEntity,
                             is FloatingButtonKeyEntity,
+                            is MotionTriggerKeyEntity,
                                 -> null
                         }
                     }.filterIsInstance<KeyCodeTriggerKey>()

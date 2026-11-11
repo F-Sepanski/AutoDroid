@@ -22,6 +22,7 @@ import io.github.sds100.keymapper.base.trigger.FloatingButtonKey
 import io.github.sds100.keymapper.base.trigger.KeyCodeTriggerKey
 import io.github.sds100.keymapper.base.trigger.KeyEventTriggerDevice
 import io.github.sds100.keymapper.base.trigger.KeyEventTriggerKey
+import io.github.sds100.keymapper.base.trigger.MotionTriggerKey
 import io.github.sds100.keymapper.base.trigger.Trigger
 import io.github.sds100.keymapper.base.trigger.TriggerKey
 import io.github.sds100.keymapper.base.trigger.TriggerMode
@@ -1959,6 +1960,7 @@ class KeyMapAlgorithm(
                 is FingerprintTriggerKey -> true
                 is FloatingButtonKey -> true
                 is KeyEventTriggerKey -> consumeEvent
+                is MotionTriggerKey -> true
             }
         }
 

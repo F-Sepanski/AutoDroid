@@ -13,6 +13,7 @@ import io.github.sds100.keymapper.data.entities.FingerprintTriggerKeyEntity
 import io.github.sds100.keymapper.data.entities.FloatingButtonEntityWithLayout
 import io.github.sds100.keymapper.data.entities.FloatingButtonKeyEntity
 import io.github.sds100.keymapper.data.entities.KeyEventTriggerKeyEntity
+import io.github.sds100.keymapper.data.entities.MotionTriggerKeyEntity
 import io.github.sds100.keymapper.data.entities.TriggerEntity
 import io.github.sds100.keymapper.data.entities.getData
 import kotlinx.serialization.Serializable
@@ -103,6 +104,8 @@ object TriggerEntityMapper {
                 is FingerprintTriggerKeyEntity -> FingerprintTriggerKey.fromEntity(key)
 
                 is EvdevTriggerKeyEntity -> EvdevTriggerKey.fromEntity(key)
+
+                is MotionTriggerKeyEntity -> MotionTriggerKey.fromEntity(key)
             }
         }
 
@@ -254,6 +257,8 @@ object TriggerEntityMapper {
                 is FingerprintTriggerKey -> FingerprintTriggerKey.toEntity(key)
 
                 is EvdevTriggerKey -> EvdevTriggerKey.toEntity(key)
+
+                is MotionTriggerKey -> MotionTriggerKey.toEntity(key)
             }
         }
 
