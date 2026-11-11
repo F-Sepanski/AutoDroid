@@ -263,6 +263,7 @@ object ActionUtils {
         ActionId.TALKBACK_GESTURE -> ActionCategory.INTERFACE
         ActionId.SET_VARIABLE -> ActionCategory.VARIABLES
         ActionId.MODIFY_VARIABLE -> ActionCategory.VARIABLES
+        ActionId.GEMINI_PROMPT -> ActionCategory.APPS
     }
 
     @StringRes
@@ -547,6 +548,7 @@ object ActionUtils {
         ActionId.TALKBACK_GESTURE -> R.string.action_talkback_gesture
         ActionId.SET_VARIABLE -> R.string.action_set_variable
         ActionId.MODIFY_VARIABLE -> R.string.action_modify_variable
+        ActionId.GEMINI_PROMPT -> R.string.action_open_assistant
     }
 
     @DrawableRes
@@ -1144,6 +1146,7 @@ object ActionUtils {
         ActionId.TALKBACK_GESTURE -> Icons.Outlined.Accessibility
         ActionId.SET_VARIABLE -> Icons.Outlined.Calculate
         ActionId.MODIFY_VARIABLE -> Icons.Outlined.Calculate
+        ActionId.GEMINI_PROMPT -> Icons.Outlined.Assistant
     }
 }
 

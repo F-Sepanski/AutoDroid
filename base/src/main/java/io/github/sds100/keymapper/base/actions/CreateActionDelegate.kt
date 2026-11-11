@@ -1405,6 +1405,11 @@ class CreateActionDelegate(
                 talkBackGestureDialogState = TalkBackGestureDialogState(initialGesture)
                 return null
             }
+
+            ActionId.GEMINI_PROMPT -> {
+                val oldAction = oldData as? ActionData.GeminiPrompt
+                return oldAction ?: ActionData.GeminiPrompt(prompt = "")
+            }
         }
     }
 

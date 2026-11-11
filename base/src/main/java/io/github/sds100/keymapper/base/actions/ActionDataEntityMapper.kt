@@ -1041,6 +1041,10 @@ object ActionDataEntityMapper {
                     value = value,
                 )
             }
+
+            ActionId.GEMINI_PROMPT -> ActionData.GeminiPrompt(
+                prompt = entity.data,
+            )
         }
     }
 
@@ -1213,6 +1217,8 @@ object ActionDataEntityMapper {
         is ActionData.GoBack -> SYSTEM_ACTION_ID_MAP[data.id]!!
 
         is ActionData.ModifySetting -> data.settingKey
+
+        is ActionData.GeminiPrompt -> data.prompt
 
         else -> SYSTEM_ACTION_ID_MAP[data.id]!!
     }
@@ -1791,5 +1797,7 @@ object ActionDataEntityMapper {
         ActionId.MODIFY_SETTING to "modify_setting",
 
         ActionId.TALKBACK_GESTURE to "talkback_gesture",
+
+        ActionId.GEMINI_PROMPT to "gemini_prompt",
     )
 }

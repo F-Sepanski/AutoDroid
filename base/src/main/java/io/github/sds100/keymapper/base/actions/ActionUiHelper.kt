@@ -839,6 +839,12 @@ class ActionUiHelper(
 
             getString(stringRes, arrayOf(action.name, action.value.toString()))
         }
+
+        is ActionData.GeminiPrompt -> if (action.prompt.isBlank()) {
+            "Gemini Prompt"
+        } else {
+            "Gemini: ${action.prompt}"
+        }
     }
 
     fun getIcon(action: ActionData): ComposeIconInfo = when (action) {

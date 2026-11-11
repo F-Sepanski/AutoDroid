@@ -55,6 +55,8 @@ import io.github.sds100.keymapper.system.display.DisplayAdapter
 import io.github.sds100.keymapper.system.display.DisplayInfo
 import io.github.sds100.keymapper.system.files.FileAdapter
 import io.github.sds100.keymapper.system.files.FileUtils
+import io.github.sds100.keymapper.system.gemini.GeminiAdapter
+import io.github.sds100.keymapper.system.gemini.GeminiExecutionMode
 import io.github.sds100.keymapper.system.inputevents.Scancode
 import io.github.sds100.keymapper.system.inputmethod.InputMethodAdapter
 import io.github.sds100.keymapper.system.intents.IntentAdapter
@@ -131,6 +133,14 @@ class PerformActionsUseCaseImpl @AssistedInject constructor(
     private val vibratorAdapter: VibratorAdapter,
     private val variablesUseCase: VariablesUseCase,
     private val buildConfigProvider: BuildConfigProvider,
+    private val geminiAdapter: GeminiAdapter = object : GeminiAdapter {
+        override suspend fun executePrompt(
+            prompt: String,
+            apiKey: String?,
+            model: String,
+            mode: GeminiExecutionMode,
+        ): KMResult<String> = Success("")
+    },
 ) : PerformActionsUseCase {
 
     companion object {
@@ -1192,6 +1202,15 @@ class PerformActionsUseCaseImpl @AssistedInject constructor(
 
             is ActionData.TalkBackGesture -> {
                 result = service.performTalkBackGesture(action.gesture)
+            }
+
+            is ActionData.GeminiPrompt -> {
+                result = geminiAdapter.executePrompt(
+                    prompt = action.prompt,
+                    apiKey = action.apiKey,
+                    model = action.model,
+                    mode = action.mode,
+                )
             }
         }
 

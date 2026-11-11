@@ -171,4 +171,6 @@ enum class ActionId {
 
     SET_VARIABLE,
     MODIFY_VARIABLE,
+
+    GEMINI_PROMPT,
 }

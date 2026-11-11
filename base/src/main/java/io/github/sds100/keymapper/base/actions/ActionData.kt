@@ -9,6 +9,7 @@ import io.github.sds100.keymapper.common.utils.Orientation
 import io.github.sds100.keymapper.common.utils.PinchScreenType
 import io.github.sds100.keymapper.common.utils.SizeKM
 import io.github.sds100.keymapper.system.camera.CameraLens
+import io.github.sds100.keymapper.system.gemini.GeminiExecutionMode
 import io.github.sds100.keymapper.system.intents.IntentExtraModel
 import io.github.sds100.keymapper.system.intents.IntentTarget
 import io.github.sds100.keymapper.system.network.HttpMethod
@@ -1173,6 +1174,21 @@ sealed class ActionData : Comparable<ActionData> {
                 { it.value },
             )
 
+            else -> super.compareTo(other)
+        }
+    }
+
+    @Serializable
+    data class GeminiPrompt(
+        val prompt: String,
+        val apiKey: String? = null,
+        val model: String = "gemini-2.0-flash",
+        val mode: GeminiExecutionMode = GeminiExecutionMode.API_FALLBACK_INTENT,
+    ) : ActionData() {
+        override val id: ActionId = ActionId.GEMINI_PROMPT
+
+        override fun compareTo(other: ActionData) = when (other) {
+            is GeminiPrompt -> prompt.compareTo(other.prompt)
             else -> super.compareTo(other)
         }
     }
