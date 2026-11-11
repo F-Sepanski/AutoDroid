@@ -66,6 +66,7 @@ fun HandleActionBottomSheets(delegate: CreateActionDelegate) {
     ModifyVariableActionBottomSheet(delegate.modifyVariableDelegate)
     BrightnessStepActionBottomSheet(delegate)
     PickTalkBackGestureDialog(delegate)
+    GeminiPromptBottomSheet(delegate)
 }
 
 @Composable
