@@ -36,6 +36,7 @@ import io.github.sds100.keymapper.system.accessibility.AccessibilityServiceEvent
 import io.github.sds100.keymapper.system.inputevents.KMGamePadEvent
 import io.github.sds100.keymapper.system.inputevents.KMKeyEvent
 import io.github.sds100.keymapper.system.inputmethod.KeyEventRelayServiceWrapper
+import io.github.sds100.keymapper.system.motion.MotionAdapter
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharedFlow
@@ -68,6 +69,7 @@ abstract class BaseAccessibilityServiceController(
     private val recordTriggerController: RecordTriggerController,
     private val setupAssistantControllerFactory: SystemBridgeSetupAssistantController.Factory,
     private val autoSwitchImeControllerFactory: AutoSwitchImeController.Factory,
+    motionAdapter: MotionAdapter? = null,
 ) {
     companion object {
         private const val DEFAULT_NOTIFICATION_TIMEOUT = 200L
@@ -87,14 +89,15 @@ abstract class BaseAccessibilityServiceController(
     val detectConstraintsUseCase = detectConstraintsUseCaseFactory.create(service)
 
     val keyMapDetectionController = KeyMapDetectionController(
-        service.lifecycleScope,
-        detectKeyMapsUseCase,
-        performActionsUseCase,
-        detectConstraintsUseCase,
-        inputEventHub,
-        pauseKeyMapsUseCase,
-        recordTriggerController,
-        settingsRepository,
+        coroutineScope = service.lifecycleScope,
+        detectUseCase = detectKeyMapsUseCase,
+        performActionsUseCase = performActionsUseCase,
+        detectConstraints = detectConstraintsUseCase,
+        inputEventHub = inputEventHub,
+        pauseKeyMapsUseCase = pauseKeyMapsUseCase,
+        recordTriggerController = recordTriggerController,
+        preferences = settingsRepository,
+        motionAdapter = motionAdapter,
     )
 
     val triggerKeyMapFromOtherAppsController = TriggerKeyMapFromOtherAppsController(

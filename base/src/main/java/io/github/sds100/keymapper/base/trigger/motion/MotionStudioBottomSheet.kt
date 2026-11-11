@@ -238,24 +238,44 @@ private fun MotionControlButtons(
     Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
         if (!isRecording) {
             Button(onClick = onStartRecording, modifier = Modifier.weight(1f)) {
-                Text(stringResource(R.string.motion_studio_record_button))
+                Text(
+                    text = stringResource(R.string.motion_studio_record_button),
+                    maxLines = 1,
+                    softWrap = false,
+                )
             }
         } else {
             val errColor = ButtonDefaults.buttonColors(
                 containerColor = MaterialTheme.colorScheme.error,
             )
             Button(onClick = onStopRecording, colors = errColor, modifier = Modifier.weight(1f)) {
-                Text(stringResource(R.string.motion_studio_stop_button))
+                Text(
+                    text = stringResource(R.string.motion_studio_stop_button),
+                    maxLines = 1,
+                    softWrap = false,
+                )
             }
         }
         OutlinedButton(onClick = onClearSequence, enabled = canClear) {
-            Text(stringResource(R.string.motion_studio_clear_button))
+            Text(
+                text = stringResource(R.string.motion_studio_clear_button),
+                maxLines = 1,
+                softWrap = false,
+            )
         }
         FilledTonalButton(onClick = onToggleTraining, enabled = canTrain) {
-            Text(stringResource(R.string.motion_studio_train_button))
+            Text(
+                text = stringResource(R.string.motion_studio_train_button),
+                maxLines = 1,
+                softWrap = false,
+            )
         }
         OutlinedButton(onClick = onToggleDebugger) {
-            Text(stringResource(R.string.motion_studio_debugger_button))
+            Text(
+                text = stringResource(R.string.motion_studio_debugger_button),
+                maxLines = 1,
+                softWrap = false,
+            )
         }
     }
 }
@@ -336,13 +356,11 @@ private fun MotionSensitivityControls(
             style = MaterialTheme.typography.bodyMedium,
         )
         Slider(
-            value = threshold,
+            value = threshold.coerceIn(5.0f, 50.0f),
             onValueChange = {
                 onSensitivityChanged(it, noisePadding)
             },
-            valueRange =
-            1.5f..8.0f,
-            steps = 13,
+            valueRange = 5.0f..50.0f,
         )
         Text(
             text = stringResource(R.string.motion_studio_padding_label, noisePadding),
@@ -353,8 +371,7 @@ private fun MotionSensitivityControls(
             onValueChange = {
                 onSensitivityChanged(threshold, it)
             },
-            valueRange =
-            0.1f..2.0f,
+            valueRange = 0.1f..2.0f,
             steps = 19,
         )
     }

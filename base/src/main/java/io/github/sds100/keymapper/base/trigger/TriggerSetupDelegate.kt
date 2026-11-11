@@ -19,7 +19,6 @@ import io.github.sds100.keymapper.sysbridge.manager.SystemBridgeConnectionManage
 import io.github.sds100.keymapper.sysbridge.manager.SystemBridgeConnectionState
 import io.github.sds100.keymapper.system.accessibility.AccessibilityServiceState
 import io.github.sds100.keymapper.system.motion.MotionAdapter
-import io.github.sds100.keymapper.system.motion.MotionComboDetector
 import io.github.sds100.keymapper.system.motion.MotionDirection
 import io.github.sds100.keymapper.system.motion.MotionTelemetry
 import javax.inject.Inject
@@ -69,8 +68,9 @@ class TriggerSetupDelegateImpl @Inject constructor(
     private val isExpertModeLocked: MutableStateFlow<Boolean> = MutableStateFlow(false)
     private val forceExpertMode: MutableStateFlow<Boolean> = MutableStateFlow(false)
 
+    private val editingMotionKey = MutableStateFlow<MotionTriggerKey?>(null)
     private val motionCurrentSequence = MutableStateFlow<List<MotionDirection>>(emptyList())
-    private val motionThreshold = MutableStateFlow(MotionComboDetector.DEFAULT_THRESHOLD)
+    private val motionThreshold = MutableStateFlow(5.0f)
     private val motionNoisePadding = MutableStateFlow(0.5f)
     private val isMotionRecording = MutableStateFlow(false)
     private val isMotionTraining = MutableStateFlow(false)
@@ -89,8 +89,17 @@ class TriggerSetupDelegateImpl @Inject constructor(
                     } else if (isMotionTraining.value) {
                         val seq = motionCurrentSequence.value
                         val step = motionTrainingCurrentStep.value
-                        if (step < seq.size && gesture.direction == seq[step]) {
-                            motionTrainingCurrentStep.value = step + 1
+                        if (seq.isNotEmpty()) {
+                            if (step < seq.size && gesture.direction == seq[step]) {
+                                val nextStep = step + 1
+                                if (nextStep >= seq.size) {
+                                    motionTrainingCurrentStep.value = 0
+                                } else {
+                                    motionTrainingCurrentStep.value = nextStep
+                                }
+                            } else {
+                                motionTrainingCurrentStep.value = 0
+                            }
                         }
                     }
                 }
@@ -134,6 +143,7 @@ class TriggerSetupDelegateImpl @Inject constructor(
 
     override fun showTriggerSetup(shortcut: TriggerSetupShortcut, forceExpertMode: Boolean) {
         if (shortcut == TriggerSetupShortcut.MOTION_COMBO) {
+            editingMotionKey.value = null
             currentSetupShortcut.value = shortcut
             motionCurrentSequence.value = emptyList()
             isMotionRecording.value = false
@@ -462,12 +472,24 @@ class TriggerSetupDelegateImpl @Inject constructor(
         isScreenOffChecked.value = isChecked
     }
 
+    override fun editMotionTriggerKey(key: MotionTriggerKey) {
+        editingMotionKey.value = key
+        motionCurrentSequence.value = key.directions
+        isMotionRecording.value = false
+        isMotionTraining.value = false
+        motionTrainingCurrentStep.value = 0
+        currentSetupShortcut.value = TriggerSetupShortcut.MOTION_COMBO
+        motionAdapter.setSensitivity(motionThreshold.value, motionNoisePadding.value)
+        motionAdapter.startListening()
+    }
+
     override fun onDismissTriggerSetup() {
         if (currentSetupShortcut.value == TriggerSetupShortcut.MOTION_COMBO) {
             motionAdapter.stopListening()
             isMotionRecording.value = false
             isMotionTraining.value = false
             motionTrainingCurrentStep.value = 0
+            editingMotionKey.value = null
         }
         currentSetupShortcut.value = null
     }
@@ -512,7 +534,21 @@ class TriggerSetupDelegateImpl @Inject constructor(
     override fun onSaveMotionCombo() {
         val sequence = motionCurrentSequence.value
         if (sequence.isNotEmpty()) {
-            onMotionComboSelected(sequence)
+            val editing = editingMotionKey.value
+            if (editing != null) {
+                configKeyMapState.update { keyMap ->
+                    val newKeys = keyMap.trigger.keys.map { k ->
+                        if (k.uid == editing.uid && k is MotionTriggerKey) {
+                            k.copy(directions = sequence)
+                        } else {
+                            k
+                        }
+                    }
+                    keyMap.copy(trigger = keyMap.trigger.copy(keys = newKeys))
+                }
+            } else {
+                onMotionComboSelected(sequence)
+            }
         }
         onDismissTriggerSetup()
     }
@@ -621,4 +657,5 @@ interface TriggerSetupDelegate {
     fun onToggleMotionTraining()
     fun onToggleMotionDebugger()
     fun onSaveMotionCombo()
+    fun editMotionTriggerKey(key: MotionTriggerKey)
 }

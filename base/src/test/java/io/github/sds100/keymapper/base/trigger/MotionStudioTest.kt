@@ -159,7 +159,7 @@ class MotionStudioTest {
     }
 
     @Test
-    fun `MotionStudio training mode validates combo steps with visual feedback`() {
+    fun `MotionStudio training mode auto-resets on incorrect gesture and combo completion`() {
         val gesturesFlow = MutableSharedFlow<MotionGesture>(extraBufferCapacity = 64)
         val motionAdapter: MotionAdapter = mock {
             on { gestures } doReturn gesturesFlow
@@ -182,21 +182,30 @@ class MotionStudioTest {
             assertTrue(state!!.isTraining)
             assertEquals(0, state.trainingCurrentStep)
 
+            // Step 0: correct gesture UP -> advances to step 1
             gesturesFlow.tryEmit(MotionGesture(MotionDirection.UP, 2000L))
             state = delegate.triggerSetupState.value as? TriggerSetupState.MotionCombo
             assertEquals(1, state!!.trainingCurrentStep)
 
+            // Step 1: incorrect gesture DOWN -> auto-resets back to step 0
             gesturesFlow.tryEmit(MotionGesture(MotionDirection.DOWN, 2300L))
+            state = delegate.triggerSetupState.value as? TriggerSetupState.MotionCombo
+            assertEquals(0, state!!.trainingCurrentStep)
+
+            // Restart from step 0: correct gesture UP -> step 1
+            gesturesFlow.tryEmit(MotionGesture(MotionDirection.UP, 2600L))
             state = delegate.triggerSetupState.value as? TriggerSetupState.MotionCombo
             assertEquals(1, state!!.trainingCurrentStep)
 
-            gesturesFlow.tryEmit(MotionGesture(MotionDirection.RIGHT, 2600L))
+            // Step 1: correct gesture RIGHT -> step 2
+            gesturesFlow.tryEmit(MotionGesture(MotionDirection.RIGHT, 2900L))
             state = delegate.triggerSetupState.value as? TriggerSetupState.MotionCombo
             assertEquals(2, state!!.trainingCurrentStep)
 
-            gesturesFlow.tryEmit(MotionGesture(MotionDirection.SHAKE, 2900L))
+            // Step 2: final gesture SHAKE completes combo -> auto-resets back to step 0
+            gesturesFlow.tryEmit(MotionGesture(MotionDirection.SHAKE, 3200L))
             state = delegate.triggerSetupState.value as? TriggerSetupState.MotionCombo
-            assertEquals(3, state!!.trainingCurrentStep)
+            assertEquals(0, state!!.trainingCurrentStep)
 
             stateJob.cancel()
         }
@@ -264,6 +273,97 @@ class MotionStudioTest {
             assertEquals(1, motionKeys.size)
             assertEquals(
                 listOf(MotionDirection.UP, MotionDirection.BACKWARD),
+                motionKeys[0].directions,
+            )
+
+            assertNull(delegate.triggerSetupState.value)
+            verify(motionAdapter).stopListening()
+
+            stateJob.cancel()
+        }
+    }
+
+    @Test
+    fun `MotionStudio sensitivity slider supports expanded range up to 50 m per s2`() {
+        val motionAdapter: MotionAdapter = mock {
+            on { gestures } doReturn MutableSharedFlow()
+            on { telemetry } doReturn MutableStateFlow(MotionTelemetry())
+        }
+
+        withDelegate(motionAdapter) { delegate, testScope ->
+            delegate.showTriggerSetup(TriggerSetupShortcut.MOTION_COMBO)
+            val stateJob = testScope.launch { delegate.triggerSetupState.collect {} }
+
+            delegate.onMotionSensitivityChanged(threshold = 50.0f, noisePadding = 2.0f)
+            val state = delegate.triggerSetupState.value as? TriggerSetupState.MotionCombo
+            assertNotNull(state)
+            assertEquals(50.0f, state!!.threshold, 0.001f)
+            assertEquals(2.0f, state.noisePadding, 0.001f)
+            verify(motionAdapter).setSensitivity(50.0f, 2.0f)
+
+            stateJob.cancel()
+        }
+    }
+
+    @Test
+    fun `MotionComboDetector calibrates with expanded threshold up to 50 m per s2`() {
+        val detector =
+            MotionComboDetector(threshold = 3.5f, debounceMs = 250L, shakeWindowMs = 150L)
+        detector.setSensitivity(threshold = 50.0f, noisePadding = 2.0f)
+
+        // Acceleration below threshold (e.g. 40.0 m/s2) is ignored
+        assertNull(detector.processSample(0f, 40.0f, 0f, 1000L))
+        // Acceleration exceeding 50.0 + 2.0 m/s2 is detected
+        assertEquals(MotionDirection.UP, detector.processSample(0f, 53.0f, 0f, 1300L))
+    }
+
+    @Test
+    fun `MotionStudio edit existing MotionTriggerKey loads sequence and updates keymap on save`() {
+        val gesturesFlow = MutableSharedFlow<MotionGesture>(extraBufferCapacity = 64)
+        val motionAdapter: MotionAdapter = mock {
+            on { gestures } doReturn gesturesFlow
+            on { telemetry } doReturn MutableStateFlow(MotionTelemetry())
+        }
+
+        val existingKey = MotionTriggerKey(
+            directions = listOf(MotionDirection.UP, MotionDirection.DOWN),
+            uid = "existing-motion-uid",
+        )
+        var savedKeyMap = KeyMap(
+            trigger = Trigger(
+                keys = listOf(existingKey),
+            ),
+        )
+        val configKeyMapState: ConfigKeyMapState = mock {
+            on { update(org.mockito.kotlin.any()) } doAnswer { invocation ->
+                @Suppress("UNCHECKED_CAST")
+                val block = invocation.arguments[0] as (KeyMap) -> KeyMap
+                savedKeyMap = block(savedKeyMap)
+                State.Data(savedKeyMap)
+            }
+        }
+
+        withDelegate(motionAdapter, configKeyMapState) { delegate, testScope ->
+            delegate.editMotionTriggerKey(existingKey)
+            val stateJob = testScope.launch { delegate.triggerSetupState.collect {} }
+
+            val state = delegate.triggerSetupState.value as? TriggerSetupState.MotionCombo
+            assertNotNull(state)
+            assertEquals(listOf(MotionDirection.UP, MotionDirection.DOWN), state!!.currentSequence)
+
+            // Start recording to overwrite with new sequence
+            delegate.onStartMotionRecording()
+            gesturesFlow.tryEmit(MotionGesture(MotionDirection.LEFT, 1000L))
+            gesturesFlow.tryEmit(MotionGesture(MotionDirection.RIGHT, 1300L))
+            delegate.onStopMotionRecording()
+
+            delegate.onSaveMotionCombo()
+
+            val motionKeys = savedKeyMap.trigger.keys.filterIsInstance<MotionTriggerKey>()
+            assertEquals(1, motionKeys.size)
+            assertEquals("existing-motion-uid", motionKeys[0].uid)
+            assertEquals(
+                listOf(MotionDirection.LEFT, MotionDirection.RIGHT),
                 motionKeys[0].directions,
             )
 

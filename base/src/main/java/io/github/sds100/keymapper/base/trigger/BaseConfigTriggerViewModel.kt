@@ -359,6 +359,7 @@ abstract class BaseConfigTriggerViewModel(
                     }
 
                     is MotionTriggerKey -> {
+                        editMotionTriggerKey(key)
                         return null
                     }
                 }
@@ -454,6 +455,14 @@ abstract class BaseConfigTriggerViewModel(
     fun onMoveTriggerKey(fromIndex: Int, toIndex: Int) = config.moveTriggerKey(fromIndex, toIndex)
 
     fun onTriggerKeyOptionsClick(id: String) {
+        val currentKeyMap = config.keyMap.value
+        if (currentKeyMap is State.Data) {
+            val key = currentKeyMap.data.trigger.keys.find { it.uid == id }
+            if (key is MotionTriggerKey) {
+                editMotionTriggerKey(key)
+                return
+            }
+        }
         triggerKeyOptionsUid.update { id }
     }
 

@@ -16,6 +16,7 @@ import io.github.sds100.keymapper.base.system.inputmethod.AutoSwitchImeControlle
 import io.github.sds100.keymapper.base.trigger.RecordTriggerController
 import io.github.sds100.keymapper.data.repositories.PreferenceRepository
 import io.github.sds100.keymapper.system.inputmethod.KeyEventRelayServiceWrapper
+import io.github.sds100.keymapper.system.motion.MotionAdapter
 
 class AccessibilityServiceController @AssistedInject constructor(
     @Assisted
@@ -32,6 +33,7 @@ class AccessibilityServiceController @AssistedInject constructor(
     recordTriggerController: RecordTriggerController,
     setupAssistantControllerFactory: SystemBridgeSetupAssistantController.Factory,
     autoSwitchImeControllerFactory: AutoSwitchImeController.Factory,
+    motionAdapter: MotionAdapter,
 ) : BaseAccessibilityServiceController(
     service = service,
     accessibilityNodeRecorderFactory = accessibilityNodeRecorderFactory,
@@ -46,6 +48,7 @@ class AccessibilityServiceController @AssistedInject constructor(
     recordTriggerController = recordTriggerController,
     setupAssistantControllerFactory = setupAssistantControllerFactory,
     autoSwitchImeControllerFactory = autoSwitchImeControllerFactory,
+    motionAdapter = motionAdapter,
 ) {
     @AssistedFactory
     interface Factory {
