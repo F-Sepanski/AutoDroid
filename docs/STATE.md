@@ -4,6 +4,7 @@
 Atualizado: 2026-11-11 · Base: develop@5e01aad08
 
 ## Entregue Recentemente (últimas 10)
+- 2026-11-11 `T-001` (`feat-motion-gesture-engine`) — feat(motion): add motion gesture detection engine and combo recognition
 - 2026-11-11 INIT `5e01aad08` — Inicialização do Fork do KeyMapper para AutoDroid, configuração do Android SDK 37, NDK 27.3, JDK 21 e tooling Multi-Engine.
 
 ## Em Andamento
