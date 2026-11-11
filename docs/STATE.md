@@ -1,10 +1,11 @@
 # Estado do Projeto — AutoDroid
 > Memória de curto prazo entre sessões. Mantido pelo manager após cada merge e ao fim de cada sessão.
 
-Atualizado: 2026-11-11 · Base: develop@3d4a191a7
+Atualizado: 2026-11-11 · Base: develop@d7ce8960e
 
 ## Entregue Recentemente (últimas 10)
-- 2026-11-11 `T-006` (`feat-motion-studio-recorder-debugger`) — feat(motion): add Motion Studio with 3D canvas visualizer, calibration, training and telemetry debugger
+- 2026-11-11 `APK BUILD v3` — APK com Motion Studio 3D, Gravador Livre, Calibração, Treinador e Debugger: `app/build/outputs/apk/debug/keymapper-4.7.0-foss-debug.apk` (50 MB).
+- 2026-11-11 `T-006` (`feat-motion-studio-recorder-debugger`) `d7ce8960` — feat(motion): add Motion Studio with 3D canvas visualizer, calibration, training and telemetry debugger
 - 2026-11-11 `T-005` (`fix-gemini-action-picker`) — fix(actions): attach GeminiPromptBottomSheet to Compose action hierarchy
 - 2026-11-11 `APK BUILD v2` — APK atualizado com controles nativos de UI: `app/build/outputs/apk/debug/keymapper-4.7.0-foss-debug.apk` (50 MB).
 - 2026-11-11 `T-004` (`feat-ui-motion-and-gemini-picker`) `3d4a191a` — feat(ui): add native UI controls for motion combos and Gemini AI prompt configuration
