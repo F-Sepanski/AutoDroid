@@ -1,0 +1,56 @@
+{
+  "keymap_db_version": 25,
+  "app_version": 111,
+  "keymap_list": [
+    {
+      "uid": "combo-flashlight-01",
+      "trigger": {
+        "keys": [
+          {
+            "directions": ["UP", "UP", "BACKWARD"],
+            "click_type": 0,
+            "uid": "UP-UP-BACKWARD"
+          }
+        ],
+        "extras": [],
+        "mode": 0,
+        "flags": 0
+      },
+      "actionList": [
+        {
+          "type": "SYSTEM_ACTION",
+          "data": "toggle_flashlight",
+          "extras": [],
+          "flags": 0,
+          "uid": "act-flash-01"
+        }
+      ],
+      "flags": 0
+    },
+    {
+      "uid": "combo-gemini-02",
+      "trigger": {
+        "keys": [
+          {
+            "directions": ["UP", "DOWN", "FORWARD"],
+            "click_type": 0,
+            "uid": "UP-DOWN-FORWARD"
+          }
+        ],
+        "extras": [],
+        "mode": 0,
+        "flags": 0
+      },
+      "actionList": [
+        {
+          "type": "SYSTEM_ACTION",
+          "data": "Ligue as luzes do meu quarto",
+          "extras": [],
+          "flags": 0,
+          "uid": "act-gemini-02"
+        }
+      ],
+      "flags": 0
+    }
+  ]
+}
