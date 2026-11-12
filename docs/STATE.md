@@ -1,10 +1,11 @@
 # Estado do Projeto — AutoDroid
 > Memória de curto prazo entre sessões. Mantido pelo manager após cada merge e ao fim de cada sessão.
 
-Atualizado: 2026-11-11 · Base: develop@aa93ae8d
+Atualizado: 2026-11-11 · Base: develop@7ab77cca
 
 ## Entregue Recentemente (últimas 10)
-- 2026-11-11 `T-010` (`fix-background-motion-sensor-lifecycle-and-gemini-overlay`) — fix(motion,gemini): preserve background motion sensor listening and launch Gemini assistant as overlay
+- 2026-11-11 `APK BUILD v6` — APK com sensores preservados em background e Gemini Assistant em modo overlay: `app/build/outputs/apk/debug/keymapper-4.7.0-foss-debug.apk` (50 MB).
+- 2026-11-11 `T-010` (`fix-background-motion-sensor-lifecycle-and-gemini-overlay`) `7ab77cca` — fix(motion,gemini): preserve background motion sensor listening and launch Gemini assistant as overlay
 - 2026-11-11 `APK BUILD v5` — APK com supressão de frenagem inercial, shake 500ms, feedback háptico e Gemini Intent sem web search: `app/build/outputs/apk/debug/keymapper-4.7.0-foss-debug.apk` (50 MB).
 - 2026-11-11 `T-009` (`fix-gemini-intent-and-response-feedback`) `aa93ae8d` — fix(gemini): replace web search with direct Gemini app intent, voice assistant and API toast feedback
 - 2026-11-11 `T-008` (`fix-motion-detection-physics-rebound-and-persistence`) `b215c20c` — fix(motion): add rebound brake suppression, biomechanical shake window, haptic feedback and persistence
