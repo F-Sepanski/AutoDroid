@@ -9,6 +9,7 @@ import android.content.Intent
 import android.content.pm.PackageManager
 import android.os.Bundle
 import android.view.accessibility.AccessibilityNodeInfo
+import android.view.accessibility.AccessibilityWindowInfo
 import io.github.sds100.keymapper.base.repositories.FakePreferenceRepository
 import io.github.sds100.keymapper.base.system.accessibility.AccessibilityNodeAction
 import io.github.sds100.keymapper.base.system.accessibility.AccessibilityNodeModel
@@ -517,5 +518,87 @@ class GeminiActionTest {
             testScheduler.advanceUntilIdle()
 
             verify(mockAccessibilityService, atLeastOnce()).performActionOnNode(any(), any())
+        }
+
+    @Test
+    fun `PerformActionsUseCase triggers GLOBAL_ACTION_VOICE_ASSIST when executing GeminiPrompt in assistant mode`() =
+        runTest(testDispatcher) {
+            useCase = createUseCase(backgroundScope)
+            whenever(
+                mockGeminiAdapter.executePrompt(any(), anyOrNull(), any(), any()),
+            ).doReturn(Success("Dispatched Assistant Intent"))
+
+            val action = ActionData.GeminiPrompt(
+                prompt = "Open Assistant",
+                mode = GeminiExecutionMode.INTENT_ONLY,
+            )
+            useCase.perform(action)
+
+            verify(mockAccessibilityService).doGlobalAction(
+                PerformActionsUseCaseImpl.GLOBAL_ACTION_VOICE_ASSIST,
+            )
+        }
+
+    @Test
+    fun `PerformActionsUseCase scans overlay windows from AccessibilityService windows and injects text into editable node`() =
+        runTest(testDispatcher) {
+            useCase = createUseCase(backgroundScope)
+            whenever(
+                mockGeminiAdapter.executePrompt(any(), anyOrNull(), any(), any()),
+            ).doReturn(Success("Dispatched Assistant Intent"))
+
+            val mockWindow1: AccessibilityWindowInfo = mock()
+            val mockWindow2: AccessibilityWindowInfo = mock()
+            val mockNonEditableRoot: AccessibilityNodeInfo = mock()
+            val mockOverlayRoot: AccessibilityNodeInfo = mock()
+            val mockEditableNode: AccessibilityNodeInfo = mock()
+            val mockSendNode: AccessibilityNodeInfo = mock()
+
+            whenever(mockAccessibilityService.windows).thenReturn(listOf(mockWindow1, mockWindow2))
+            whenever(mockWindow1.root).thenReturn(mockNonEditableRoot)
+            whenever(mockWindow2.root).thenReturn(mockOverlayRoot)
+
+            whenever(mockNonEditableRoot.childCount).thenReturn(0)
+            whenever(mockOverlayRoot.childCount).thenReturn(2)
+            whenever(mockOverlayRoot.getChild(0)).thenReturn(mockEditableNode)
+            whenever(mockOverlayRoot.getChild(1)).thenReturn(mockSendNode)
+
+            whenever(mockEditableNode.isEditable).thenReturn(true)
+            whenever(mockSendNode.isClickable).thenReturn(true)
+            whenever(mockSendNode.contentDescription).thenReturn("Submit")
+
+            val action = ActionData.GeminiPrompt(prompt = "Hello from overlay")
+            useCase.perform(action)
+            testScheduler.advanceUntilIdle()
+
+            val bundleCaptor = argumentCaptor<Bundle>()
+            verify(mockEditableNode).performAction(
+                eq(AccessibilityNodeInfo.ACTION_SET_TEXT),
+                bundleCaptor.capture(),
+            )
+            assertEquals(
+                "Hello from overlay",
+                bundleCaptor.firstValue.getCharSequence(
+                    AccessibilityNodeInfo.ACTION_ARGUMENT_SET_TEXT_CHARSEQUENCE,
+                )?.toString(),
+            )
+            verify(mockSendNode).performAction(AccessibilityNodeInfo.ACTION_CLICK)
+        }
+
+    @Test
+    fun `AndroidGeminiAdapter does not fail or throw when background startActivity is blocked`() =
+        runTest(testDispatcher) {
+            whenever(mockContext.startActivity(any())).thenThrow(
+                SecurityException("Background activity start blocked"),
+            )
+
+            val adapter = AndroidGeminiAdapter(mockContext)
+            val result = adapter.executePrompt(
+                "Explain quantum computing",
+                mode = GeminiExecutionMode.INTENT_ONLY,
+            )
+
+            assertThat(result is Success, equalTo(true))
+            assertEquals("Dispatched Assistant Intent", (result as Success).value)
         }
 }

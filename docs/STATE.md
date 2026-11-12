@@ -4,6 +4,7 @@
 Atualizado: 2026-11-12 · Base: develop@da9aeb43
 
 ## Entregue Recentemente (últimas 10)
+- 2026-11-12 `T-012` (`fix-assistant-launch-via-perform-global-action`) — fix(gemini): invoke assistant via GLOBAL_ACTION_VOICE_ASSIST and scan multi-window overlays
 - 2026-11-12 `APK BUILD v7` — APK com auto-type e auto-submit no Assistente via Acessibilidade e queries de visibilidade de pacotes: `app/build/outputs/apk/debug/keymapper-4.7.0-foss-debug.apk` (50 MB).
 - 2026-11-12 `T-011` (`feat-gemini-assistant-accessibility-auto-type-and-queries`) `da9aeb43` — feat(gemini): auto-type and submit prompt via accessibility overlay and add package visibility queries
 - 2026-11-11 `APK BUILD v6` — APK com sensores preservados em background e Gemini Assistant em modo overlay: `app/build/outputs/apk/debug/keymapper-4.7.0-foss-debug.apk` (50 MB).
@@ -13,8 +14,6 @@ Atualizado: 2026-11-12 · Base: develop@da9aeb43
 - 2026-11-11 `T-008` (`fix-motion-detection-physics-rebound-and-persistence`) `b215c20c` — fix(motion): add rebound brake suppression, biomechanical shake window, haptic feedback and persistence
 - 2026-11-11 `APK BUILD v4` — APK com sensibilidade até 50m/s², botões corrigidos, treino com auto-reset, edição de gatilhos e execução no serviço: `app/build/outputs/apk/debug/keymapper-4.7.0-foss-debug.apk` (50 MB).
 - 2026-11-11 `T-007` (`feat-motion-studio-refinements-and-service-execution`) `3d25f83e` — feat(motion): refine Motion Studio range/layout/training and wire MotionAdapter to accessibility service
-- 2026-11-11 `APK BUILD v3` — APK com Motion Studio 3D, Gravador Livre, Calibração, Treinador e Debugger: `app/build/outputs/apk/debug/keymapper-4.7.0-foss-debug.apk` (50 MB).
-- 2026-11-11 `T-006` (`feat-motion-studio-recorder-debugger`) `d7ce8960` — feat(motion): add Motion Studio with 3D canvas visualizer, calibration, training and telemetry debugger
 
 ## Em Andamento
 - Build de APK real com interface nativa testado e pronto para instalação.

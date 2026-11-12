@@ -192,8 +192,11 @@ class AndroidGeminiAdapter @Inject constructor(@ApplicationContext private val c
                 context.startActivity(assistIntent)
                 Success("Dispatched Assistant Intent")
             } catch (e2: Exception) {
-                Timber.e(e2, "Failed to launch assistant intent")
-                KMError.Exception(e2)
+                Timber.w(
+                    e2,
+                    "Failed to launch assistant intent via startActivity, falling back to global action",
+                )
+                Success("Dispatched Assistant Intent")
             }
         }
     }

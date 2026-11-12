@@ -147,6 +147,7 @@ class PerformActionsUseCaseImpl @AssistedInject constructor(
 ) : PerformActionsUseCase {
 
     companion object {
+        const val GLOBAL_ACTION_VOICE_ASSIST = 16
         private const val SETTING_NIGHT_DISPLAY_ACTIVATED = "night_display_activated"
     }
 
@@ -1223,6 +1224,7 @@ class PerformActionsUseCaseImpl @AssistedInject constructor(
                         )
 
                 if (involvesAssistant) {
+                    service.doGlobalAction(GLOBAL_ACTION_VOICE_ASSIST)
                     coroutineScope.launch {
                         autoTypeAndSendPrompt(action.prompt)
                     }
@@ -1335,23 +1337,35 @@ class PerformActionsUseCaseImpl @AssistedInject constructor(
     }
 
     internal suspend fun autoTypeAndSendPrompt(prompt: String) {
-        val maxAttempts = 17
+        val maxAttempts = 20
         for (attempt in 0 until maxAttempts) {
-            val root = (service as? AccessibilityService)?.rootInActiveWindow
-            if (root != null) {
-                val editableNode = root.findNodeRecursively { it.isEditable }
-                if (editableNode != null) {
-                    editableNode.performAction(
-                        AccessibilityNodeInfo.ACTION_SET_TEXT,
-                        bundleOf(
-                            AccessibilityNodeInfo.ACTION_ARGUMENT_SET_TEXT_CHARSEQUENCE to prompt,
-                        ),
-                    )
-                    val sendButton = root.findNodeRecursively { node ->
-                        isSendButton(node)
+            val accessibilityService = service as? AccessibilityService
+            val roots = try {
+                accessibilityService?.windows?.mapNotNull { it.root }?.ifEmpty { null }
+                    ?: listOfNotNull(accessibilityService?.rootInActiveWindow)
+            } catch (_: Exception) {
+                listOfNotNull(accessibilityService?.rootInActiveWindow)
+            }
+
+            if (roots.isNotEmpty()) {
+                for (root in roots) {
+                    val editableNode = root.findNodeRecursively { it.isEditable }
+                    if (editableNode != null) {
+                        editableNode.performAction(
+                            AccessibilityNodeInfo.ACTION_SET_TEXT,
+                            bundleOf(
+                                AccessibilityNodeInfo.ACTION_ARGUMENT_SET_TEXT_CHARSEQUENCE to
+                                    prompt,
+                            ),
+                        )
+                        val sendButton = root.findNodeRecursively { node ->
+                            isSendButton(node)
+                        } ?: roots.firstNotNullOfOrNull { r ->
+                            r.findNodeRecursively { isSendButton(it) }
+                        }
+                        sendButton?.performAction(AccessibilityNodeInfo.ACTION_CLICK)
+                        return
                     }
-                    sendButton?.performAction(AccessibilityNodeInfo.ACTION_CLICK)
-                    return
                 }
             } else {
                 var injected = false
@@ -1399,11 +1413,13 @@ class PerformActionsUseCaseImpl @AssistedInject constructor(
         val text = node.text?.toString().orEmpty()
         val viewId = node.viewIdResourceName.orEmpty()
 
-        val keywords = listOf("Send", "Enviar", "Search", "Pesquisar")
+        val keywords = listOf("Send", "Enviar", "Search", "Pesquisar", "Submit")
         val matchesKeyword = keywords.any { keyword ->
             desc.contains(keyword, ignoreCase = true) || text.contains(keyword, ignoreCase = true)
         }
-        val matchesId = viewId.contains("send", ignoreCase = true)
+        val matchesId = viewId.contains("send", ignoreCase = true) ||
+            viewId.contains("search", ignoreCase = true) ||
+            viewId.contains("submit", ignoreCase = true)
 
         return matchesKeyword || matchesId
     }
@@ -1416,11 +1432,13 @@ class PerformActionsUseCaseImpl @AssistedInject constructor(
         val text = node.text.orEmpty()
         val viewId = node.viewResourceId.orEmpty()
 
-        val keywords = listOf("Send", "Enviar", "Search", "Pesquisar")
+        val keywords = listOf("Send", "Enviar", "Search", "Pesquisar", "Submit")
         val matchesKeyword = keywords.any { keyword ->
             desc.contains(keyword, ignoreCase = true) || text.contains(keyword, ignoreCase = true)
         }
-        val matchesId = viewId.contains("send", ignoreCase = true)
+        val matchesId = viewId.contains("send", ignoreCase = true) ||
+            viewId.contains("search", ignoreCase = true) ||
+            viewId.contains("submit", ignoreCase = true)
 
         return matchesKeyword || matchesId
     }
