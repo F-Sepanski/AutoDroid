@@ -1,10 +1,11 @@
 # Estado do Projeto — AutoDroid
 > Memória de curto prazo entre sessões. Mantido pelo manager após cada merge e ao fim de cada sessão.
 
-Atualizado: 2026-11-12 · Base: develop@da9aeb43
+Atualizado: 2026-11-12 · Base: develop@3759378d
 
 ## Entregue Recentemente (últimas 10)
-- 2026-11-12 `T-012` (`fix-assistant-launch-via-perform-global-action`) — fix(gemini): invoke assistant via GLOBAL_ACTION_VOICE_ASSIST and scan multi-window overlays
+- 2026-11-12 `APK BUILD v8` — APK com invocação do Assistente via GLOBAL_ACTION_VOICE_ASSIST e varredura multi-window: `app/build/outputs/apk/debug/keymapper-4.7.0-foss-debug.apk` (50 MB).
+- 2026-11-12 `T-012` (`fix-assistant-launch-via-perform-global-action`) `3759378d` — fix(gemini): invoke assistant via GLOBAL_ACTION_VOICE_ASSIST and scan multi-window overlays
 - 2026-11-12 `APK BUILD v7` — APK com auto-type e auto-submit no Assistente via Acessibilidade e queries de visibilidade de pacotes: `app/build/outputs/apk/debug/keymapper-4.7.0-foss-debug.apk` (50 MB).
 - 2026-11-12 `T-011` (`feat-gemini-assistant-accessibility-auto-type-and-queries`) `da9aeb43` — feat(gemini): auto-type and submit prompt via accessibility overlay and add package visibility queries
 - 2026-11-11 `APK BUILD v6` — APK com sensores preservados em background e Gemini Assistant em modo overlay: `app/build/outputs/apk/debug/keymapper-4.7.0-foss-debug.apk` (50 MB).
