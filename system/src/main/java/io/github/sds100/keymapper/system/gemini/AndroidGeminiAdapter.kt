@@ -1,8 +1,11 @@
 package io.github.sds100.keymapper.system.gemini
 
-import android.app.SearchManager
 import android.content.Context
 import android.content.Intent
+import android.content.pm.PackageManager
+import android.os.Handler
+import android.os.Looper
+import android.widget.Toast
 import dagger.hilt.android.qualifiers.ApplicationContext
 import io.github.sds100.keymapper.common.utils.KMError
 import io.github.sds100.keymapper.common.utils.KMResult
@@ -30,7 +33,11 @@ import timber.log.Timber
 class AndroidGeminiAdapter @Inject constructor(@ApplicationContext private val context: Context) :
     GeminiAdapter {
 
-    internal var httpClient: OkHttpClient = OkHttpClient()
+    companion object {
+        const val GEMINI_PACKAGE = "com.google.android.apps.bard"
+    }
+
+    var httpClient: OkHttpClient = OkHttpClient()
 
     override suspend fun executePrompt(
         prompt: String,
@@ -52,7 +59,10 @@ class AndroidGeminiAdapter @Inject constructor(@ApplicationContext private val c
 
         val apiResult = callGeminiApi(prompt, apiKey, model)
         return when (apiResult) {
-            is Success -> apiResult
+            is Success -> {
+                showResponseFeedback(apiResult.value)
+                apiResult
+            }
             is KMError -> {
                 if (mode == GeminiExecutionMode.API_FALLBACK_INTENT) {
                     dispatchAssistantIntent(prompt)
@@ -130,19 +140,59 @@ class AndroidGeminiAdapter @Inject constructor(@ApplicationContext private val c
         }
     }
 
-    private fun dispatchAssistantIntent(prompt: String): KMResult<String> {
-        val intent = Intent(Intent.ACTION_WEB_SEARCH).apply {
-            putExtra(SearchManager.QUERY, prompt)
+    private fun showResponseFeedback(text: String) {
+        try {
+            Handler(Looper.getMainLooper()).post {
+                Toast.makeText(context, text.take(150), Toast.LENGTH_LONG).show()
+            }
+        } catch (e: Throwable) {
+            Timber.e(e, "Failed to show Gemini response toast")
+        }
+    }
+
+    private fun isPackageInstalled(packageName: String): Boolean {
+        return try {
+            context.packageManager.getPackageInfo(packageName, 0)
+            true
+        } catch (e: PackageManager.NameNotFoundException) {
+            false
+        } catch (e: Exception) {
+            false
+        }
+    }
+
+    internal fun dispatchAssistantIntent(prompt: String): KMResult<String> {
+        if (isPackageInstalled(GEMINI_PACKAGE)) {
+            val geminiIntent = Intent(Intent.ACTION_SEND).apply {
+                type = "text/plain"
+                putExtra(Intent.EXTRA_TEXT, prompt)
+                setPackage(GEMINI_PACKAGE)
+                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            }
+            try {
+                context.startActivity(geminiIntent)
+                return Success("Dispatched Assistant Intent")
+            } catch (e: Exception) {
+                Timber.w(
+                    e,
+                    "Failed to launch Gemini app intent, falling back to voice command / assist",
+                )
+            }
+        }
+
+        val voiceIntent = Intent(Intent.ACTION_VOICE_COMMAND).apply {
+            putExtra(Intent.EXTRA_TEXT, prompt)
             putExtra("query", prompt)
             addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
         }
 
         return try {
-            context.startActivity(intent)
+            context.startActivity(voiceIntent)
             Success("Dispatched Assistant Intent")
         } catch (e: Exception) {
             try {
                 val assistIntent = Intent(Intent.ACTION_ASSIST).apply {
+                    putExtra(Intent.EXTRA_TEXT, prompt)
                     putExtra("query", prompt)
                     addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
                 }
