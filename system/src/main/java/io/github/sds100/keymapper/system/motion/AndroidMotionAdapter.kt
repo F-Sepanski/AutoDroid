@@ -5,6 +5,10 @@ import android.hardware.Sensor
 import android.hardware.SensorEvent
 import android.hardware.SensorEventListener
 import android.hardware.SensorManager
+import android.os.Build
+import android.os.VibrationEffect
+import android.os.Vibrator
+import android.os.VibratorManager
 import androidx.core.content.getSystemService
 import dagger.hilt.android.qualifiers.ApplicationContext
 import javax.inject.Inject
@@ -25,8 +29,31 @@ class AndroidMotionAdapter @Inject constructor(
     private val detector: MotionComboDetector,
 ) : MotionAdapter {
 
+    private val prefs by lazy {
+        val appContext = context.applicationContext ?: context
+        appContext.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+    }
+
+    val savedThreshold: Float
+        get() = prefs.getFloat(KEY_THRESHOLD, DEFAULT_THRESHOLD)
+
+    val savedNoisePadding: Float
+        get() = prefs.getFloat(KEY_NOISE_PADDING, DEFAULT_NOISE_PADDING)
+
+    private val vibrator: Vibrator? by lazy {
+        val appContext = context.applicationContext ?: context
+        appContext.getSystemService()
+    }
+
+    init {
+        val initialThreshold = prefs.getFloat(KEY_THRESHOLD, DEFAULT_THRESHOLD)
+        val initialNoisePadding = prefs.getFloat(KEY_NOISE_PADDING, DEFAULT_NOISE_PADDING)
+        detector.setSensitivity(initialThreshold, initialNoisePadding)
+    }
+
     private val sensorManager: SensorManager? by lazy {
-        context.applicationContext.getSystemService()
+        val appContext = context.applicationContext ?: context
+        appContext.getSystemService()
     }
 
     private val linearAccelerationSensor: Sensor? by lazy {
@@ -103,14 +130,43 @@ class AndroidMotionAdapter @Inject constructor(
             val triggered = detector.feedGesture(gesture, combos)
             if (triggered != null) {
                 _triggeredCombos.tryEmit(triggered)
+                performHapticFeedback()
             }
         }
 
         override fun onAccuracyChanged(sensor: Sensor?, accuracy: Int) = Unit
     }
 
+    private fun performHapticFeedback() {
+        try {
+            val appContext = context.applicationContext ?: context
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                val vibratorManager = appContext.getSystemService(
+                    Context.VIBRATOR_MANAGER_SERVICE,
+                ) as? VibratorManager
+                val vib = vibratorManager?.defaultVibrator ?: vibrator
+                vib?.vibrate(VibrationEffect.createPredefined(VibrationEffect.EFFECT_CLICK))
+            } else if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                vibrator?.vibrate(VibrationEffect.createPredefined(VibrationEffect.EFFECT_CLICK))
+            } else if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                vibrator?.vibrate(
+                    VibrationEffect.createOneShot(50L, VibrationEffect.DEFAULT_AMPLITUDE),
+                )
+            } else {
+                @Suppress("DEPRECATION")
+                vibrator?.vibrate(50L)
+            }
+        } catch (_: Throwable) {
+            // Safe fallback if vibrator is unavailable
+        }
+    }
+
     override fun setSensitivity(threshold: Float, noisePadding: Float) {
         detector.setSensitivity(threshold, noisePadding)
+        prefs.edit()
+            ?.putFloat(KEY_THRESHOLD, threshold)
+            ?.putFloat(KEY_NOISE_PADDING, noisePadding)
+            ?.apply()
     }
 
     override fun registerCombos(combos: List<MotionCombo>) {
@@ -178,5 +234,13 @@ class AndroidMotionAdapter @Inject constructor(
             values[1] - gravity[1],
             values[2] - gravity[2],
         )
+    }
+
+    companion object {
+        const val PREFS_NAME = "motion_adapter_preferences"
+        const val KEY_THRESHOLD = "motion_threshold"
+        const val KEY_NOISE_PADDING = "motion_noise_padding"
+        const val DEFAULT_THRESHOLD = 5.0f
+        const val DEFAULT_NOISE_PADDING = 0.5f
     }
 }

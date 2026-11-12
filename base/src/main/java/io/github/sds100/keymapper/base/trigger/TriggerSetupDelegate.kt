@@ -18,6 +18,7 @@ import io.github.sds100.keymapper.common.utils.onSuccess
 import io.github.sds100.keymapper.sysbridge.manager.SystemBridgeConnectionManager
 import io.github.sds100.keymapper.sysbridge.manager.SystemBridgeConnectionState
 import io.github.sds100.keymapper.system.accessibility.AccessibilityServiceState
+import io.github.sds100.keymapper.system.motion.AndroidMotionAdapter
 import io.github.sds100.keymapper.system.motion.MotionAdapter
 import io.github.sds100.keymapper.system.motion.MotionDirection
 import io.github.sds100.keymapper.system.motion.MotionTelemetry
@@ -80,6 +81,10 @@ class TriggerSetupDelegateImpl @Inject constructor(
     override val motionTelemetry: StateFlow<MotionTelemetry> = motionAdapter.telemetry
 
     init {
+        (motionAdapter as? AndroidMotionAdapter)?.let { adapter ->
+            motionThreshold.value = adapter.savedThreshold
+            motionNoisePadding.value = adapter.savedNoisePadding
+        }
         viewModelScope.launch {
             motionAdapter.gestures.collect { gesture ->
                 if (currentSetupShortcut.value == TriggerSetupShortcut.MOTION_COMBO) {
@@ -149,6 +154,10 @@ class TriggerSetupDelegateImpl @Inject constructor(
             isMotionRecording.value = false
             isMotionTraining.value = false
             motionTrainingCurrentStep.value = 0
+            (motionAdapter as? AndroidMotionAdapter)?.let { adapter ->
+                motionThreshold.value = adapter.savedThreshold
+                motionNoisePadding.value = adapter.savedNoisePadding
+            }
             motionAdapter.setSensitivity(motionThreshold.value, motionNoisePadding.value)
             motionAdapter.startListening()
             return
@@ -479,6 +488,10 @@ class TriggerSetupDelegateImpl @Inject constructor(
         isMotionTraining.value = false
         motionTrainingCurrentStep.value = 0
         currentSetupShortcut.value = TriggerSetupShortcut.MOTION_COMBO
+        (motionAdapter as? AndroidMotionAdapter)?.let { adapter ->
+            motionThreshold.value = adapter.savedThreshold
+            motionNoisePadding.value = adapter.savedNoisePadding
+        }
         motionAdapter.setSensitivity(motionThreshold.value, motionNoisePadding.value)
         motionAdapter.startListening()
     }
@@ -532,6 +545,7 @@ class TriggerSetupDelegateImpl @Inject constructor(
     }
 
     override fun onSaveMotionCombo() {
+        motionAdapter.setSensitivity(motionThreshold.value, motionNoisePadding.value)
         val sequence = motionCurrentSequence.value
         if (sequence.isNotEmpty()) {
             val editing = editingMotionKey.value

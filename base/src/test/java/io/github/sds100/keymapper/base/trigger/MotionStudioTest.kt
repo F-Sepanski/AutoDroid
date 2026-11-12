@@ -1,5 +1,7 @@
 package io.github.sds100.keymapper.base.trigger
 
+import android.content.Context
+import android.content.SharedPreferences
 import io.github.sds100.keymapper.base.keymaps.ConfigKeyMapState
 import io.github.sds100.keymapper.base.keymaps.KeyMap
 import io.github.sds100.keymapper.base.onboarding.SetupAccessibilityServiceDelegate
@@ -7,6 +9,7 @@ import io.github.sds100.keymapper.common.utils.State
 import io.github.sds100.keymapper.sysbridge.manager.SystemBridgeConnectionManager
 import io.github.sds100.keymapper.sysbridge.manager.SystemBridgeConnectionState
 import io.github.sds100.keymapper.system.accessibility.AccessibilityServiceState
+import io.github.sds100.keymapper.system.motion.AndroidMotionAdapter
 import io.github.sds100.keymapper.system.motion.MotionAdapter
 import io.github.sds100.keymapper.system.motion.MotionComboDetector
 import io.github.sds100.keymapper.system.motion.MotionDirection
@@ -29,10 +32,14 @@ import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
+import org.mockito.kotlin.any
 import org.mockito.kotlin.doAnswer
 import org.mockito.kotlin.doReturn
+import org.mockito.kotlin.eq
 import org.mockito.kotlin.mock
+import org.mockito.kotlin.times
 import org.mockito.kotlin.verify
+import org.mockito.kotlin.whenever
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class MotionStudioTest {
@@ -369,6 +376,117 @@ class MotionStudioTest {
 
             assertNull(delegate.triggerSetupState.value)
             verify(motionAdapter).stopListening()
+
+            stateJob.cancel()
+        }
+    }
+
+    @Test
+    fun `MotionStudio save motion combo persists sensitivity to motion adapter`() {
+        val motionAdapter: MotionAdapter = mock {
+            on { gestures } doReturn MutableSharedFlow()
+            on { telemetry } doReturn MutableStateFlow(MotionTelemetry())
+        }
+        val configKeyMapState: ConfigKeyMapState = mock {
+            on { update(any()) } doReturn State.Data(KeyMap())
+        }
+
+        withDelegate(motionAdapter, configKeyMapState) { delegate, testScope ->
+            delegate.showTriggerSetup(TriggerSetupShortcut.MOTION_COMBO)
+            val stateJob = testScope.launch { delegate.triggerSetupState.collect {} }
+
+            delegate.onMotionSensitivityChanged(threshold = 7.5f, noisePadding = 1.5f)
+            delegate.onSaveMotionCombo()
+
+            verify(motionAdapter, times(2)).setSensitivity(7.5f, 1.5f)
+
+            stateJob.cancel()
+        }
+    }
+
+    @Test
+    fun `AndroidMotionAdapter loads and persists sensitivity in SharedPreferences`() {
+        val sharedPrefs = mock<SharedPreferences>()
+        val editor = mock<SharedPreferences.Editor>()
+        whenever(sharedPrefs.edit()).thenReturn(editor)
+        whenever(editor.putFloat(any(), any())).thenReturn(editor)
+        whenever(
+            sharedPrefs.getFloat(
+                AndroidMotionAdapter.KEY_THRESHOLD,
+                AndroidMotionAdapter.DEFAULT_THRESHOLD,
+            ),
+        ).thenReturn(8.0f)
+        whenever(
+            sharedPrefs.getFloat(
+                AndroidMotionAdapter.KEY_NOISE_PADDING,
+                AndroidMotionAdapter.DEFAULT_NOISE_PADDING,
+            ),
+        ).thenReturn(1.2f)
+
+        val context = mock<Context>()
+        whenever(context.applicationContext).thenReturn(context)
+        whenever(
+            context.getSharedPreferences(
+                eq(AndroidMotionAdapter.PREFS_NAME),
+                eq(Context.MODE_PRIVATE),
+            ),
+        ).thenReturn(sharedPrefs)
+
+        val detector = mock<MotionComboDetector>()
+        val adapter = AndroidMotionAdapter(context, detector)
+
+        // Verifies init loads persisted sensitivity from prefs and applies to detector
+        verify(detector).setSensitivity(8.0f, 1.2f)
+        assertEquals(8.0f, adapter.savedThreshold, 0.001f)
+        assertEquals(1.2f, adapter.savedNoisePadding, 0.001f)
+
+        // Verifies setSensitivity saves to prefs and updates detector
+        adapter.setSensitivity(9.0f, 1.5f)
+        verify(editor).putFloat(AndroidMotionAdapter.KEY_THRESHOLD, 9.0f)
+        verify(editor).putFloat(AndroidMotionAdapter.KEY_NOISE_PADDING, 1.5f)
+        verify(editor).apply()
+        verify(detector).setSensitivity(9.0f, 1.5f)
+    }
+
+    @Test
+    fun `TriggerSetupDelegate restores persisted sensitivity from AndroidMotionAdapter on show`() {
+        val sharedPrefs = mock<SharedPreferences>()
+        val editor = mock<SharedPreferences.Editor>()
+        whenever(sharedPrefs.edit()).thenReturn(editor)
+        whenever(editor.putFloat(any(), any())).thenReturn(editor)
+        whenever(
+            sharedPrefs.getFloat(
+                AndroidMotionAdapter.KEY_THRESHOLD,
+                AndroidMotionAdapter.DEFAULT_THRESHOLD,
+            ),
+        ).thenReturn(6.5f)
+        whenever(
+            sharedPrefs.getFloat(
+                AndroidMotionAdapter.KEY_NOISE_PADDING,
+                AndroidMotionAdapter.DEFAULT_NOISE_PADDING,
+            ),
+        ).thenReturn(1.8f)
+
+        val context = mock<Context>()
+        whenever(context.applicationContext).thenReturn(context)
+        whenever(
+            context.getSharedPreferences(
+                eq(AndroidMotionAdapter.PREFS_NAME),
+                eq(Context.MODE_PRIVATE),
+            ),
+        ).thenReturn(sharedPrefs)
+
+        val detector = mock<MotionComboDetector>()
+        val adapter = AndroidMotionAdapter(context, detector)
+
+        withDelegate(adapter) { delegate, testScope ->
+            delegate.showTriggerSetup(TriggerSetupShortcut.MOTION_COMBO)
+            val stateJob = testScope.launch { delegate.triggerSetupState.collect {} }
+
+            val state = delegate.triggerSetupState.value as? TriggerSetupState.MotionCombo
+            assertNotNull(state)
+            assertEquals(6.5f, state!!.threshold, 0.001f)
+            assertEquals(1.8f, state.noisePadding, 0.001f)
 
             stateJob.cancel()
         }

@@ -26,15 +26,25 @@ interface MotionComboDetector {
     companion object {
         const val DEFAULT_THRESHOLD = 3.5f
         const val DEFAULT_DEBOUNCE_MS = 250L
-        const val DEFAULT_SHAKE_WINDOW_MS = 150L
+        const val DEFAULT_SHAKE_WINDOW_MS = 500L
+        const val DEFAULT_REBOUND_WINDOW_MS = 450L
+        const val DEFAULT_SHAKE_COOLDOWN_MS = 350L
 
         operator fun invoke(
             threshold: Float = DEFAULT_THRESHOLD,
             debounceMs: Long = DEFAULT_DEBOUNCE_MS,
             shakeWindowMs: Long = DEFAULT_SHAKE_WINDOW_MS,
             noisePadding: Float = 0f,
-        ): MotionComboDetector =
-            MotionComboDetectorImpl(threshold, debounceMs, shakeWindowMs, noisePadding)
+            reboundWindowMs: Long = DEFAULT_REBOUND_WINDOW_MS,
+            shakeCooldownMs: Long = DEFAULT_SHAKE_COOLDOWN_MS,
+        ): MotionComboDetector = MotionComboDetectorImpl(
+            threshold = threshold,
+            debounceMs = debounceMs,
+            shakeWindowMs = shakeWindowMs,
+            noisePadding = noisePadding,
+            reboundWindowMs = reboundWindowMs,
+            shakeCooldownMs = shakeCooldownMs,
+        )
     }
 }
 
@@ -43,6 +53,8 @@ class MotionComboDetectorImpl(
     private val debounceMs: Long = MotionComboDetector.DEFAULT_DEBOUNCE_MS,
     private val shakeWindowMs: Long = MotionComboDetector.DEFAULT_SHAKE_WINDOW_MS,
     private var noisePadding: Float = 0f,
+    private val reboundWindowMs: Long = MotionComboDetector.DEFAULT_REBOUND_WINDOW_MS,
+    private val shakeCooldownMs: Long = MotionComboDetector.DEFAULT_SHAKE_COOLDOWN_MS,
 ) : MotionComboDetector {
 
     @Inject
@@ -51,6 +63,8 @@ class MotionComboDetectorImpl(
         debounceMs = MotionComboDetector.DEFAULT_DEBOUNCE_MS,
         shakeWindowMs = MotionComboDetector.DEFAULT_SHAKE_WINDOW_MS,
         noisePadding = 0f,
+        reboundWindowMs = MotionComboDetector.DEFAULT_REBOUND_WINDOW_MS,
+        shakeCooldownMs = MotionComboDetector.DEFAULT_SHAKE_COOLDOWN_MS,
     )
 
     private enum class Axis { X, Y, Z }
@@ -58,7 +72,14 @@ class MotionComboDetectorImpl(
     private var lastPeakAxis: Axis? = null
     private var lastPeakSign: Int = 0
     private var lastPeakTimestampMs: Long = 0L
-    private var lastGestureTimestampMs: Long = 0L
+
+    private var lastEmittedAxis: Axis? = null
+    private var lastEmittedSign: Int = 0
+    private var lastEmittedTimestampMs: Long = 0L
+
+    private var shakeReversalCount: Int = 0
+    private var shakeStartTimestampMs: Long = 0L
+    private var shakeCooldownUntilMs: Long = 0L
 
     private val gestureHistory = mutableListOf<MotionGesture>()
 
@@ -68,6 +89,10 @@ class MotionComboDetectorImpl(
     }
 
     override fun processSample(x: Float, y: Float, z: Float, timestampMs: Long): MotionDirection? {
+        if (timestampMs < shakeCooldownUntilMs) {
+            return null
+        }
+
         val absX = abs(x)
         val absY = abs(y)
         val absZ = abs(z)
@@ -97,17 +122,49 @@ class MotionComboDetectorImpl(
         }
 
         val dtPeak = timestampMs - lastPeakTimestampMs
-        val isShake = lastPeakAxis == axis && sign != lastPeakSign && dtPeak < shakeWindowMs
+        val isReversal = lastPeakAxis == axis && sign != lastPeakSign && dtPeak <= shakeWindowMs
 
-        if (isShake) {
+        if (lastPeakAxis != axis || dtPeak > shakeWindowMs) {
+            shakeReversalCount = 0
+            shakeStartTimestampMs = 0L
+        }
+
+        if (isReversal) {
+            if (shakeReversalCount == 0) {
+                shakeStartTimestampMs = lastPeakTimestampMs
+            }
+            shakeReversalCount++
+        }
+
+        if (isReversal &&
+            shakeReversalCount >= 2 &&
+            timestampMs - shakeStartTimestampMs <= shakeWindowMs
+        ) {
+            shakeCooldownUntilMs = timestampMs + shakeCooldownMs
+            shakeReversalCount = 0
+            shakeStartTimestampMs = 0L
             lastPeakAxis = axis
             lastPeakSign = sign
             lastPeakTimestampMs = timestampMs
-            lastGestureTimestampMs = timestampMs
+            lastEmittedAxis = null
+            lastEmittedSign = 0
+            lastEmittedTimestampMs = timestampMs
             return MotionDirection.SHAKE
         }
 
-        val dtGesture = timestampMs - lastGestureTimestampMs
+        val dtEmitted = timestampMs - lastEmittedTimestampMs
+        val isRebound = lastEmittedAxis == axis &&
+            sign == -lastEmittedSign &&
+            dtEmitted <= reboundWindowMs
+
+        if (isRebound) {
+            lastPeakAxis = axis
+            lastPeakSign = sign
+            lastPeakTimestampMs = timestampMs
+            return null
+        }
+
+        val dtGesture = timestampMs - lastEmittedTimestampMs
         if (dtGesture < debounceMs) {
             return null
         }
@@ -115,7 +172,11 @@ class MotionComboDetectorImpl(
         lastPeakAxis = axis
         lastPeakSign = sign
         lastPeakTimestampMs = timestampMs
-        lastGestureTimestampMs = timestampMs
+        lastEmittedAxis = axis
+        lastEmittedSign = sign
+        lastEmittedTimestampMs = timestampMs
+        shakeReversalCount = 0
+        shakeStartTimestampMs = 0L
         return direction
     }
 
@@ -168,6 +229,11 @@ class MotionComboDetectorImpl(
         lastPeakAxis = null
         lastPeakSign = 0
         lastPeakTimestampMs = 0L
-        lastGestureTimestampMs = 0L
+        lastEmittedAxis = null
+        lastEmittedSign = 0
+        lastEmittedTimestampMs = 0L
+        shakeReversalCount = 0
+        shakeStartTimestampMs = 0L
+        shakeCooldownUntilMs = 0L
     }
 }
