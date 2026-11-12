@@ -1,8 +1,8 @@
 package io.github.sds100.keymapper.system.gemini
 
+import android.app.SearchManager
 import android.content.Context
 import android.content.Intent
-import android.content.pm.PackageManager
 import android.os.Handler
 import android.os.Looper
 import android.widget.Toast
@@ -150,39 +150,11 @@ class AndroidGeminiAdapter @Inject constructor(@ApplicationContext private val c
         }
     }
 
-    private fun isPackageInstalled(packageName: String): Boolean {
-        return try {
-            context.packageManager.getPackageInfo(packageName, 0)
-            true
-        } catch (e: PackageManager.NameNotFoundException) {
-            false
-        } catch (e: Exception) {
-            false
-        }
-    }
-
     internal fun dispatchAssistantIntent(prompt: String): KMResult<String> {
-        if (isPackageInstalled(GEMINI_PACKAGE)) {
-            val geminiIntent = Intent(Intent.ACTION_SEND).apply {
-                type = "text/plain"
-                putExtra(Intent.EXTRA_TEXT, prompt)
-                setPackage(GEMINI_PACKAGE)
-                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-            }
-            try {
-                context.startActivity(geminiIntent)
-                return Success("Dispatched Assistant Intent")
-            } catch (e: Exception) {
-                Timber.w(
-                    e,
-                    "Failed to launch Gemini app intent, falling back to voice command / assist",
-                )
-            }
-        }
-
         val voiceIntent = Intent(Intent.ACTION_VOICE_COMMAND).apply {
-            putExtra(Intent.EXTRA_TEXT, prompt)
+            putExtra(SearchManager.QUERY, prompt)
             putExtra("query", prompt)
+            putExtra(Intent.EXTRA_TEXT, prompt)
             addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
         }
 
@@ -192,8 +164,9 @@ class AndroidGeminiAdapter @Inject constructor(@ApplicationContext private val c
         } catch (e: Exception) {
             try {
                 val assistIntent = Intent(Intent.ACTION_ASSIST).apply {
-                    putExtra(Intent.EXTRA_TEXT, prompt)
+                    putExtra(SearchManager.QUERY, prompt)
                     putExtra("query", prompt)
+                    putExtra(Intent.EXTRA_TEXT, prompt)
                     addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
                 }
                 context.startActivity(assistIntent)

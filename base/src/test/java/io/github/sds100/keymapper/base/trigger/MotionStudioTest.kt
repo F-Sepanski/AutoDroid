@@ -2,6 +2,9 @@ package io.github.sds100.keymapper.base.trigger
 
 import android.content.Context
 import android.content.SharedPreferences
+import android.hardware.Sensor
+import android.hardware.SensorEventListener
+import android.hardware.SensorManager
 import io.github.sds100.keymapper.base.keymaps.ConfigKeyMapState
 import io.github.sds100.keymapper.base.keymaps.KeyMap
 import io.github.sds100.keymapper.base.onboarding.SetupAccessibilityServiceDelegate
@@ -11,6 +14,7 @@ import io.github.sds100.keymapper.sysbridge.manager.SystemBridgeConnectionState
 import io.github.sds100.keymapper.system.accessibility.AccessibilityServiceState
 import io.github.sds100.keymapper.system.motion.AndroidMotionAdapter
 import io.github.sds100.keymapper.system.motion.MotionAdapter
+import io.github.sds100.keymapper.system.motion.MotionCombo
 import io.github.sds100.keymapper.system.motion.MotionComboDetector
 import io.github.sds100.keymapper.system.motion.MotionDirection
 import io.github.sds100.keymapper.system.motion.MotionGesture
@@ -37,6 +41,7 @@ import org.mockito.kotlin.doAnswer
 import org.mockito.kotlin.doReturn
 import org.mockito.kotlin.eq
 import org.mockito.kotlin.mock
+import org.mockito.kotlin.never
 import org.mockito.kotlin.times
 import org.mockito.kotlin.verify
 import org.mockito.kotlin.whenever
@@ -487,6 +492,148 @@ class MotionStudioTest {
             assertNotNull(state)
             assertEquals(6.5f, state!!.threshold, 0.001f)
             assertEquals(1.8f, state.noisePadding, 0.001f)
+
+            stateJob.cancel()
+        }
+    }
+
+    @Test
+    fun `AndroidMotionAdapter keeps sensor active in background when stopListening is called with registered combos`() {
+        val sharedPrefs = mock<SharedPreferences>()
+        whenever(
+            sharedPrefs.getFloat(
+                AndroidMotionAdapter.KEY_THRESHOLD,
+                AndroidMotionAdapter.DEFAULT_THRESHOLD,
+            ),
+        ).thenReturn(5.0f)
+        whenever(
+            sharedPrefs.getFloat(
+                AndroidMotionAdapter.KEY_NOISE_PADDING,
+                AndroidMotionAdapter.DEFAULT_NOISE_PADDING,
+            ),
+        ).thenReturn(0.5f)
+
+        val sensorManager = mock<SensorManager>()
+        val linearSensor = mock<Sensor>()
+        whenever(linearSensor.type).thenReturn(Sensor.TYPE_LINEAR_ACCELERATION)
+        whenever(
+            sensorManager.getDefaultSensor(Sensor.TYPE_LINEAR_ACCELERATION),
+        ).thenReturn(linearSensor)
+
+        val context = mock<Context>()
+        whenever(context.applicationContext).thenReturn(context)
+        whenever(
+            context.getSharedPreferences(
+                eq(AndroidMotionAdapter.PREFS_NAME),
+                eq(Context.MODE_PRIVATE),
+            ),
+        ).thenReturn(sharedPrefs)
+        whenever(context.getSystemService(SensorManager::class.java)).thenReturn(sensorManager)
+        whenever(context.getSystemService(Context.SENSOR_SERVICE)).thenReturn(sensorManager)
+
+        val detector = mock<MotionComboDetector>()
+        val adapter = AndroidMotionAdapter(context, detector)
+
+        val combo = MotionCombo(
+            id = "flashlight-combo",
+            sequence = listOf(MotionDirection.UP, MotionDirection.DOWN),
+        )
+        adapter.registerCombos(listOf(combo))
+
+        // When combos are registered, sensor should be registered in SensorManager
+        verify(sensorManager).registerListener(
+            any(),
+            eq(linearSensor),
+            eq(SensorManager.SENSOR_DELAY_GAME),
+        )
+        assertTrue(adapter.isListening)
+        assertTrue(adapter.isSensorListenerRegistered)
+        assertFalse(adapter.isStudioListening)
+
+        // Studio opens: startListening called
+        adapter.startListening()
+        assertTrue(adapter.isStudioListening)
+        assertTrue(adapter.isListening)
+        assertTrue(adapter.isSensorListenerRegistered)
+
+        // Studio closes: stopListening called
+        adapter.stopListening()
+
+        // Verify adapter is still listening in background for registered combos
+        assertFalse(adapter.isStudioListening)
+        assertTrue(adapter.isListening)
+        assertTrue(adapter.isSensorListenerRegistered)
+        verify(sensorManager, never()).unregisterListener(any<SensorEventListener>())
+        verify(detector, never()).reset()
+
+        // When combos are cleared, sensor is unregistered and detector is reset
+        adapter.registerCombos(emptyList())
+        assertFalse(adapter.isListening)
+        assertFalse(adapter.isSensorListenerRegistered)
+        verify(sensorManager).unregisterListener(any<SensorEventListener>())
+        verify(detector).reset()
+    }
+
+    @Test
+    fun `TriggerSetupDelegate onDismissTriggerSetup does not stop background detection when combos are registered`() {
+        val sharedPrefs = mock<SharedPreferences>()
+        whenever(
+            sharedPrefs.getFloat(
+                AndroidMotionAdapter.KEY_THRESHOLD,
+                AndroidMotionAdapter.DEFAULT_THRESHOLD,
+            ),
+        ).thenReturn(5.0f)
+        whenever(
+            sharedPrefs.getFloat(
+                AndroidMotionAdapter.KEY_NOISE_PADDING,
+                AndroidMotionAdapter.DEFAULT_NOISE_PADDING,
+            ),
+        ).thenReturn(0.5f)
+
+        val sensorManager = mock<SensorManager>()
+        val linearSensor = mock<Sensor>()
+        whenever(linearSensor.type).thenReturn(Sensor.TYPE_LINEAR_ACCELERATION)
+        whenever(
+            sensorManager.getDefaultSensor(Sensor.TYPE_LINEAR_ACCELERATION),
+        ).thenReturn(linearSensor)
+
+        val context = mock<Context>()
+        whenever(context.applicationContext).thenReturn(context)
+        whenever(
+            context.getSharedPreferences(
+                eq(AndroidMotionAdapter.PREFS_NAME),
+                eq(Context.MODE_PRIVATE),
+            ),
+        ).thenReturn(sharedPrefs)
+        whenever(context.getSystemService(SensorManager::class.java)).thenReturn(sensorManager)
+        whenever(context.getSystemService(Context.SENSOR_SERVICE)).thenReturn(sensorManager)
+
+        val detector = mock<MotionComboDetector>()
+        val adapter = AndroidMotionAdapter(context, detector)
+
+        // Service registers combos in background
+        val combo = MotionCombo(id = "service-combo", sequence = listOf(MotionDirection.FORWARD))
+        adapter.registerCombos(listOf(combo))
+        assertTrue(adapter.isListening)
+
+        withDelegate(adapter) { delegate, testScope ->
+            // Open studio
+            delegate.showTriggerSetup(TriggerSetupShortcut.MOTION_COMBO)
+            val stateJob = testScope.launch { delegate.triggerSetupState.collect {} }
+
+            assertTrue(adapter.isStudioListening)
+            assertTrue(adapter.isListening)
+
+            // Close studio (simulate user dismissing studio)
+            delegate.onDismissTriggerSetup()
+
+            assertNull(delegate.triggerSetupState.value)
+            assertFalse(adapter.isStudioListening)
+            // Decoupling: background detection is STILL ACTIVE
+            assertTrue(adapter.isListening)
+            assertTrue(adapter.isSensorListenerRegistered)
+            verify(sensorManager, never()).unregisterListener(any<SensorEventListener>())
+            verify(detector, never()).reset()
 
             stateJob.cancel()
         }

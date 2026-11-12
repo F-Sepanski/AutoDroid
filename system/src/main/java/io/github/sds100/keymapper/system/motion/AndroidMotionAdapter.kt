@@ -82,16 +82,22 @@ class AndroidMotionAdapter @Inject constructor(
     override val telemetry: StateFlow<MotionTelemetry> = _telemetry.asStateFlow()
 
     private val registeredCombos = mutableListOf<MotionCombo>()
-    private var listening: Boolean = false
+    var isStudioListening: Boolean = false
+        private set
     private var isSensorRegistered: Boolean = false
     private var isUsingLinearSensor: Boolean = false
+
+    val isSensorListenerRegistered: Boolean
+        get() = synchronized(registeredCombos) { isSensorRegistered }
 
     private val gravity = FloatArray(3)
     private var hasGravity = false
     private val alpha = 0.8f
 
     override val isListening: Boolean
-        get() = synchronized(registeredCombos) { listening }
+        get() = synchronized(registeredCombos) {
+            isStudioListening || registeredCombos.isNotEmpty()
+        }
 
     private val sensorEventListener = object : SensorEventListener {
         override fun onSensorChanged(event: SensorEvent?) {
@@ -174,29 +180,35 @@ class AndroidMotionAdapter @Inject constructor(
             registeredCombos.clear()
             registeredCombos.addAll(combos)
             updateSensorStateLocked()
+            if (!isStudioListening && registeredCombos.isEmpty()) {
+                detector.reset()
+                _telemetry.value = MotionTelemetry()
+            }
         }
     }
 
     override fun startListening() {
         synchronized(registeredCombos) {
-            if (listening) return
-            listening = true
+            if (isStudioListening) return
+            isStudioListening = true
             updateSensorStateLocked()
         }
     }
 
     override fun stopListening() {
         synchronized(registeredCombos) {
-            if (!listening) return
-            listening = false
+            if (!isStudioListening) return
+            isStudioListening = false
             updateSensorStateLocked()
-            detector.reset()
-            _telemetry.value = MotionTelemetry()
+            if (registeredCombos.isEmpty()) {
+                detector.reset()
+                _telemetry.value = MotionTelemetry()
+            }
         }
     }
 
     private fun updateSensorStateLocked() {
-        val shouldListen = listening
+        val shouldListen = isStudioListening || registeredCombos.isNotEmpty()
         val manager = sensorManager ?: return
 
         if (shouldListen && !isSensorRegistered) {

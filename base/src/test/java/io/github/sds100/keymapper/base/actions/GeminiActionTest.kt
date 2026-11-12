@@ -1,5 +1,6 @@
 package io.github.sds100.keymapper.base.actions
 
+import android.app.SearchManager
 import android.content.ActivityNotFoundException
 import android.content.Context
 import android.content.Intent
@@ -197,7 +198,7 @@ class GeminiActionTest {
         }
 
     @Test
-    fun `AndroidGeminiAdapter dispatches ACTION_SEND when bard package is installed`() =
+    fun `AndroidGeminiAdapter dispatches ACTION_VOICE_COMMAND in overlay mode without opening full-screen ACTION_SEND`() =
         runTest(testDispatcher) {
             whenever(
                 mockPackageManager.getPackageInfo(AndroidGeminiAdapter.GEMINI_PACKAGE, 0),
@@ -215,10 +216,12 @@ class GeminiActionTest {
             val intent = captor.firstValue
 
             assertNotEquals(Intent.ACTION_WEB_SEARCH, intent.action)
-            assertEquals(Intent.ACTION_SEND, intent.action)
-            assertEquals(AndroidGeminiAdapter.GEMINI_PACKAGE, intent.`package`)
+            assertNotEquals(Intent.ACTION_SEND, intent.action)
+            assertEquals(Intent.ACTION_VOICE_COMMAND, intent.action)
+            assertNull(intent.`package`)
             assertEquals("Explain quantum computing", intent.getStringExtra(Intent.EXTRA_TEXT))
-            assertEquals("text/plain", intent.type)
+            assertEquals("Explain quantum computing", intent.getStringExtra(SearchManager.QUERY))
+            assertEquals("Explain quantum computing", intent.getStringExtra("query"))
             assertThat(
                 intent.flags and Intent.FLAG_ACTIVITY_NEW_TASK,
                 equalTo(Intent.FLAG_ACTIVITY_NEW_TASK),
@@ -241,8 +244,11 @@ class GeminiActionTest {
             val intent = captor.firstValue
 
             assertNotEquals(Intent.ACTION_WEB_SEARCH, intent.action)
+            assertNotEquals(Intent.ACTION_SEND, intent.action)
             assertEquals(Intent.ACTION_VOICE_COMMAND, intent.action)
+            assertNull(intent.`package`)
             assertEquals("Play music", intent.getStringExtra(Intent.EXTRA_TEXT))
+            assertEquals("Play music", intent.getStringExtra(SearchManager.QUERY))
             assertEquals("Play music", intent.getStringExtra("query"))
             assertThat(
                 intent.flags and Intent.FLAG_ACTIVITY_NEW_TASK,
@@ -274,36 +280,16 @@ class GeminiActionTest {
 
             assertEquals(Intent.ACTION_VOICE_COMMAND, captor.firstValue.action)
             assertNotEquals(Intent.ACTION_WEB_SEARCH, captor.secondValue.action)
+            assertNotEquals(Intent.ACTION_SEND, captor.secondValue.action)
             assertEquals(Intent.ACTION_ASSIST, captor.secondValue.action)
+            assertNull(captor.secondValue.`package`)
             assertEquals("Set alarm", captor.secondValue.getStringExtra(Intent.EXTRA_TEXT))
+            assertEquals("Set alarm", captor.secondValue.getStringExtra(SearchManager.QUERY))
             assertEquals("Set alarm", captor.secondValue.getStringExtra("query"))
-        }
-
-    @Test
-    fun `AndroidGeminiAdapter falls back to voice command when Gemini intent fails`() =
-        runTest(testDispatcher) {
-            whenever(
-                mockPackageManager.getPackageInfo(AndroidGeminiAdapter.GEMINI_PACKAGE, 0),
-            ).thenReturn(mock())
-
-            whenever(mockContext.startActivity(any())).thenAnswer { invocation ->
-                val intent = invocation.getArgument<Intent>(0)
-                if (intent.`package` == AndroidGeminiAdapter.GEMINI_PACKAGE) {
-                    throw ActivityNotFoundException("Gemini activity not found")
-                }
-                null
-            }
-
-            val adapter = AndroidGeminiAdapter(mockContext)
-            val result = adapter.executePrompt("Help me", mode = GeminiExecutionMode.INTENT_ONLY)
-
-            assertThat(result is Success, equalTo(true))
-            val captor = argumentCaptor<Intent>()
-            verify(mockContext, times(2)).startActivity(captor.capture())
-
-            assertEquals(AndroidGeminiAdapter.GEMINI_PACKAGE, captor.firstValue.`package`)
-            assertEquals(Intent.ACTION_VOICE_COMMAND, captor.secondValue.action)
-            assertNotEquals(Intent.ACTION_WEB_SEARCH, captor.secondValue.action)
+            assertThat(
+                captor.secondValue.flags and Intent.FLAG_ACTIVITY_NEW_TASK,
+                equalTo(Intent.FLAG_ACTIVITY_NEW_TASK),
+            )
         }
 
     @Test
