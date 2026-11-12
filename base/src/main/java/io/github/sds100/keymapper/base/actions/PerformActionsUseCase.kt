@@ -5,6 +5,7 @@ import android.os.Build
 import android.view.InputDevice
 import android.view.KeyEvent
 import android.view.accessibility.AccessibilityNodeInfo
+import androidx.core.os.bundleOf
 import dagger.assisted.Assisted
 import dagger.assisted.AssistedFactory
 import dagger.assisted.AssistedInject
@@ -15,6 +16,7 @@ import io.github.sds100.keymapper.base.input.InputEventHub
 import io.github.sds100.keymapper.base.system.accessibility.AccessibilityNodeAction
 import io.github.sds100.keymapper.base.system.accessibility.AccessibilityNodeModel
 import io.github.sds100.keymapper.base.system.accessibility.IAccessibilityService
+import io.github.sds100.keymapper.base.system.accessibility.findNodeRecursively
 import io.github.sds100.keymapper.base.system.inputmethod.ImeInputEventInjector
 import io.github.sds100.keymapper.base.system.inputmethod.KeyMapperImeHelper
 import io.github.sds100.keymapper.base.system.inputmethod.SwitchImeInterface
@@ -89,6 +91,7 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withContext
 import timber.log.Timber
@@ -1211,6 +1214,19 @@ class PerformActionsUseCaseImpl @AssistedInject constructor(
                     model = action.model,
                     mode = action.mode,
                 )
+                val involvesAssistant = action.mode == GeminiExecutionMode.INTENT_ONLY ||
+                    action.apiKey.isNullOrBlank() ||
+                    (
+                        action.mode == GeminiExecutionMode.API_FALLBACK_INTENT &&
+                            result is Success &&
+                            result.value == "Dispatched Assistant Intent"
+                        )
+
+                if (involvesAssistant) {
+                    coroutineScope.launch {
+                        autoTypeAndSendPrompt(action.prompt)
+                    }
+                }
             }
         }
 
@@ -1316,6 +1332,97 @@ class PerformActionsUseCaseImpl @AssistedInject constructor(
 
     private fun <T> compareIfNonNull(a: T?, b: T?): Boolean {
         return a != null && b != null && a == b
+    }
+
+    internal suspend fun autoTypeAndSendPrompt(prompt: String) {
+        val maxAttempts = 17
+        for (attempt in 0 until maxAttempts) {
+            val root = (service as? AccessibilityService)?.rootInActiveWindow
+            if (root != null) {
+                val editableNode = root.findNodeRecursively { it.isEditable }
+                if (editableNode != null) {
+                    editableNode.performAction(
+                        AccessibilityNodeInfo.ACTION_SET_TEXT,
+                        bundleOf(
+                            AccessibilityNodeInfo.ACTION_ARGUMENT_SET_TEXT_CHARSEQUENCE to prompt,
+                        ),
+                    )
+                    val sendButton = root.findNodeRecursively { node ->
+                        isSendButton(node)
+                    }
+                    sendButton?.performAction(AccessibilityNodeInfo.ACTION_CLICK)
+                    return
+                }
+            } else {
+                var injected = false
+                val textResult = service.performActionOnNode(
+                    findNode = { it.isEditable },
+                    performAction = {
+                        injected = true
+                        AccessibilityNodeAction(
+                            AccessibilityNodeInfo.ACTION_SET_TEXT,
+                            mapOf(
+                                AccessibilityNodeInfo.ACTION_ARGUMENT_SET_TEXT_CHARSEQUENCE to
+                                    prompt,
+                            ),
+                        )
+                    },
+                )
+                if (textResult is Success && injected) {
+                    service.performActionOnNode(
+                        findNode = { isSendButtonModel(it) },
+                        performAction = {
+                            AccessibilityNodeAction(AccessibilityNodeInfo.ACTION_CLICK)
+                        },
+                    )
+                    return
+                }
+            }
+            delay(150.milliseconds)
+        }
+    }
+
+    private fun isSendButton(node: AccessibilityNodeInfo): Boolean {
+        val isClickable = node.isClickable ||
+            (
+                try {
+                    node.actionList?.any { it.id == AccessibilityNodeInfo.ACTION_CLICK } == true
+                } catch (
+                    _: Exception,
+                ) {
+                    false
+                }
+                )
+        if (!isClickable) return false
+
+        val desc = node.contentDescription?.toString().orEmpty()
+        val text = node.text?.toString().orEmpty()
+        val viewId = node.viewIdResourceName.orEmpty()
+
+        val keywords = listOf("Send", "Enviar", "Search", "Pesquisar")
+        val matchesKeyword = keywords.any { keyword ->
+            desc.contains(keyword, ignoreCase = true) || text.contains(keyword, ignoreCase = true)
+        }
+        val matchesId = viewId.contains("send", ignoreCase = true)
+
+        return matchesKeyword || matchesId
+    }
+
+    private fun isSendButtonModel(node: AccessibilityNodeModel): Boolean {
+        val isClickable = node.actions.contains(AccessibilityNodeInfo.ACTION_CLICK)
+        if (!isClickable) return false
+
+        val desc = node.contentDescription.orEmpty()
+        val text = node.text.orEmpty()
+        val viewId = node.viewResourceId.orEmpty()
+
+        val keywords = listOf("Send", "Enviar", "Search", "Pesquisar")
+        val matchesKeyword = keywords.any { keyword ->
+            desc.contains(keyword, ignoreCase = true) || text.contains(keyword, ignoreCase = true)
+        }
+        val matchesId = viewId.contains("send", ignoreCase = true)
+
+        return matchesKeyword || matchesId
     }
 
     private fun getActiveDisplay(): DisplayInfo? =

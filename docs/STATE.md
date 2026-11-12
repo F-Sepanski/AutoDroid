@@ -4,6 +4,7 @@
 Atualizado: 2026-11-11 · Base: develop@7ab77cca
 
 ## Entregue Recentemente (últimas 10)
+- 2026-11-12 `T-011` (`feat-gemini-assistant-accessibility-auto-type-and-queries`) — feat(gemini): auto-type and submit prompt via accessibility overlay and add package visibility queries
 - 2026-11-11 `APK BUILD v6` — APK com sensores preservados em background e Gemini Assistant em modo overlay: `app/build/outputs/apk/debug/keymapper-4.7.0-foss-debug.apk` (50 MB).
 - 2026-11-11 `T-010` (`fix-background-motion-sensor-lifecycle-and-gemini-overlay`) `7ab77cca` — fix(motion,gemini): preserve background motion sensor listening and launch Gemini assistant as overlay
 - 2026-11-11 `APK BUILD v5` — APK com supressão de frenagem inercial, shake 500ms, feedback háptico e Gemini Intent sem web search: `app/build/outputs/apk/debug/keymapper-4.7.0-foss-debug.apk` (50 MB).
@@ -13,8 +14,6 @@ Atualizado: 2026-11-11 · Base: develop@7ab77cca
 - 2026-11-11 `T-007` (`feat-motion-studio-refinements-and-service-execution`) `3d25f83e` — feat(motion): refine Motion Studio range/layout/training and wire MotionAdapter to accessibility service
 - 2026-11-11 `APK BUILD v3` — APK com Motion Studio 3D, Gravador Livre, Calibração, Treinador e Debugger: `app/build/outputs/apk/debug/keymapper-4.7.0-foss-debug.apk` (50 MB).
 - 2026-11-11 `T-006` (`feat-motion-studio-recorder-debugger`) `d7ce8960` — feat(motion): add Motion Studio with 3D canvas visualizer, calibration, training and telemetry debugger
-- 2026-11-11 `T-005` (`fix-gemini-action-picker`) — fix(actions): attach GeminiPromptBottomSheet to Compose action hierarchy
-- 2026-11-11 `APK BUILD v2` — APK atualizado com controles nativos de UI: `app/build/outputs/apk/debug/keymapper-4.7.0-foss-debug.apk` (50 MB).
 
 ## Em Andamento
 - Build de APK real com interface nativa testado e pronto para instalação.

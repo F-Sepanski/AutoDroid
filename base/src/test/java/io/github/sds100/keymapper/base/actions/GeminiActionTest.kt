@@ -2,10 +2,18 @@ package io.github.sds100.keymapper.base.actions
 
 import android.app.SearchManager
 import android.content.ActivityNotFoundException
+import android.content.ClipData
+import android.content.ClipboardManager
 import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
-import io.github.sds100.keymapper.base.system.accessibility.IAccessibilityService
+import android.os.Bundle
+import android.view.accessibility.AccessibilityNodeInfo
+import io.github.sds100.keymapper.base.repositories.FakePreferenceRepository
+import io.github.sds100.keymapper.base.system.accessibility.AccessibilityNodeAction
+import io.github.sds100.keymapper.base.system.accessibility.AccessibilityNodeModel
+import io.github.sds100.keymapper.base.system.accessibility.BaseAccessibilityService
+import io.github.sds100.keymapper.common.utils.KMError
 import io.github.sds100.keymapper.common.utils.Success
 import io.github.sds100.keymapper.system.gemini.AndroidGeminiAdapter
 import io.github.sds100.keymapper.system.gemini.GeminiAdapter
@@ -31,8 +39,11 @@ import org.junit.runner.RunWith
 import org.mockito.kotlin.any
 import org.mockito.kotlin.anyOrNull
 import org.mockito.kotlin.argumentCaptor
+import org.mockito.kotlin.atLeastOnce
 import org.mockito.kotlin.doReturn
+import org.mockito.kotlin.eq
 import org.mockito.kotlin.mock
+import org.mockito.kotlin.never
 import org.mockito.kotlin.times
 import org.mockito.kotlin.verify
 import org.mockito.kotlin.whenever
@@ -46,7 +57,7 @@ class GeminiActionTest {
     private val testCoroutineScope = TestScope(testDispatcher)
 
     private lateinit var mockGeminiAdapter: GeminiAdapter
-    private lateinit var mockAccessibilityService: IAccessibilityService
+    private lateinit var mockAccessibilityService: BaseAccessibilityService
     private lateinit var useCase: PerformActionsUseCaseImpl
     private lateinit var mockContext: Context
     private lateinit var mockPackageManager: PackageManager
@@ -59,8 +70,12 @@ class GeminiActionTest {
         mockPackageManager = mock()
         whenever(mockContext.packageManager).thenReturn(mockPackageManager)
 
-        useCase = PerformActionsUseCaseImpl(
-            coroutineScope = testCoroutineScope,
+        useCase = createUseCase(testCoroutineScope)
+    }
+
+    private fun createUseCase(scope: kotlinx.coroutines.CoroutineScope): PerformActionsUseCaseImpl =
+        PerformActionsUseCaseImpl(
+            coroutineScope = scope,
             service = mockAccessibilityService,
             inputMethodAdapter = mock(),
             switchImeInterface = mock(),
@@ -90,7 +105,7 @@ class GeminiActionTest {
             soundsManager = mock(),
             notificationAdapter = mock(),
             ringtoneAdapter = mock(),
-            settingsRepository = mock(),
+            settingsRepository = FakePreferenceRepository(),
             inputEventHub = mock(),
             systemBridgeConnectionManager = mock(),
             settingsAdapter = mock(),
@@ -101,7 +116,6 @@ class GeminiActionTest {
             },
             geminiAdapter = mockGeminiAdapter,
         )
-    }
 
     @Test
     fun `ActionData GeminiPrompt has correct default values and ActionId`() {
@@ -321,5 +335,187 @@ class GeminiActionTest {
 
             assertThat(result is Success, equalTo(true))
             assertEquals("Generated response", (result as Success).value)
+        }
+
+    @Test
+    fun `AndroidGeminiAdapter copies prompt to clipboard when dispatching assistant intent`() =
+        runTest(testDispatcher) {
+            val mockClipboardManager: ClipboardManager = mock()
+            whenever(
+                mockContext.getSystemService(Context.CLIPBOARD_SERVICE),
+            ).thenReturn(mockClipboardManager)
+
+            val adapter = AndroidGeminiAdapter(mockContext)
+            val result = adapter.executePrompt(
+                "Explain quantum computing",
+                mode = GeminiExecutionMode.INTENT_ONLY,
+            )
+
+            assertThat(result is Success, equalTo(true))
+            val captor = argumentCaptor<ClipData>()
+            verify(mockClipboardManager).setPrimaryClip(captor.capture())
+            assertEquals(
+                "Explain quantum computing",
+                captor.firstValue.getItemAt(0).text.toString(),
+            )
+        }
+
+    @Test
+    fun `PerformActionsUseCase injects prompt text and clicks send button via AccessibilityService rootInActiveWindow`() =
+        runTest(testDispatcher) {
+            useCase = createUseCase(backgroundScope)
+            whenever(
+                mockGeminiAdapter.executePrompt(any(), anyOrNull(), any(), any()),
+            ).doReturn(Success("Dispatched Assistant Intent"))
+
+            val mockRootNode: AccessibilityNodeInfo = mock()
+            val mockEditableNode: AccessibilityNodeInfo = mock()
+            val mockSendNode: AccessibilityNodeInfo = mock()
+
+            whenever(mockAccessibilityService.rootInActiveWindow).thenReturn(mockRootNode)
+            whenever(mockRootNode.childCount).thenReturn(2)
+            whenever(mockRootNode.getChild(0)).thenReturn(mockEditableNode)
+            whenever(mockRootNode.getChild(1)).thenReturn(mockSendNode)
+
+            whenever(mockEditableNode.isEditable).thenReturn(true)
+            whenever(mockSendNode.isClickable).thenReturn(true)
+            whenever(mockSendNode.contentDescription).thenReturn("Send")
+
+            val action = ActionData.GeminiPrompt(prompt = "Hello Gemini")
+            useCase.perform(action)
+            testScheduler.advanceUntilIdle()
+
+            val bundleCaptor = argumentCaptor<Bundle>()
+            verify(mockEditableNode).performAction(
+                eq(AccessibilityNodeInfo.ACTION_SET_TEXT),
+                bundleCaptor.capture(),
+            )
+            assertEquals(
+                "Hello Gemini",
+                bundleCaptor.firstValue.getCharSequence(
+                    AccessibilityNodeInfo.ACTION_ARGUMENT_SET_TEXT_CHARSEQUENCE,
+                )?.toString(),
+            )
+            verify(mockSendNode).performAction(AccessibilityNodeInfo.ACTION_CLICK)
+        }
+
+    @Test
+    fun `PerformActionsUseCase recognizes localized send buttons and view ids`() =
+        runTest(testDispatcher) {
+            useCase = createUseCase(backgroundScope)
+            whenever(
+                mockGeminiAdapter.executePrompt(any(), anyOrNull(), any(), any()),
+            ).doReturn(Success("Dispatched Assistant Intent"))
+
+            val mockRootNode: AccessibilityNodeInfo = mock()
+            val mockEditableNode: AccessibilityNodeInfo = mock()
+            val mockSendNode: AccessibilityNodeInfo = mock()
+
+            whenever(mockAccessibilityService.rootInActiveWindow).thenReturn(mockRootNode)
+            whenever(mockRootNode.childCount).thenReturn(2)
+            whenever(mockRootNode.getChild(0)).thenReturn(mockEditableNode)
+            whenever(mockRootNode.getChild(1)).thenReturn(mockSendNode)
+
+            whenever(mockEditableNode.isEditable).thenReturn(true)
+            whenever(mockSendNode.isClickable).thenReturn(true)
+            whenever(
+                mockSendNode.viewIdResourceName,
+            ).thenReturn("com.google.android.apps.bard:id/send_button")
+
+            val action = ActionData.GeminiPrompt(prompt = "Traduza para português")
+            useCase.perform(action)
+            testScheduler.advanceUntilIdle()
+
+            verify(mockEditableNode).performAction(
+                eq(AccessibilityNodeInfo.ACTION_SET_TEXT),
+                any(),
+            )
+            verify(mockSendNode).performAction(AccessibilityNodeInfo.ACTION_CLICK)
+        }
+
+    @Test
+    fun `PerformActionsUseCase does not trigger accessibility auto-type when mode is API_ONLY with valid key`() =
+        runTest(testDispatcher) {
+            useCase = createUseCase(backgroundScope)
+            whenever(
+                mockGeminiAdapter.executePrompt(any(), anyOrNull(), any(), any()),
+            ).doReturn(Success("API result text"))
+
+            val action = ActionData.GeminiPrompt(
+                prompt = "Hello",
+                apiKey = "test-key",
+                mode = GeminiExecutionMode.API_ONLY,
+            )
+            useCase.perform(action)
+            testScheduler.advanceUntilIdle()
+
+            verify(mockAccessibilityService, never()).rootInActiveWindow
+        }
+
+    @Test
+    fun `PerformActionsUseCase falls back to performActionOnNode when rootInActiveWindow is null`() =
+        runTest(testDispatcher) {
+            useCase = createUseCase(backgroundScope)
+            whenever(
+                mockGeminiAdapter.executePrompt(any(), anyOrNull(), any(), any()),
+            ).doReturn(Success("Dispatched Assistant Intent"))
+
+            whenever(mockAccessibilityService.rootInActiveWindow).thenReturn(null)
+
+            whenever(
+                mockAccessibilityService.performActionOnNode(any(), any()),
+            ).thenAnswer { invocation ->
+                val findNode = invocation.getArgument<(AccessibilityNodeModel) -> Boolean>(0)
+                val performAction = invocation.getArgument<
+                    (
+                        AccessibilityNodeModel,
+                    ) -> AccessibilityNodeAction?,
+                    >(1)
+
+                val testNode = AccessibilityNodeModel(
+                    packageName = "com.google.android.apps.bard",
+                    contentDescription = null,
+                    isFocused = true,
+                    text = null,
+                    textSelectionStart = 0,
+                    textSelectionEnd = 0,
+                    isEditable = true,
+                    className = "android.widget.EditText",
+                    uniqueId = null,
+                    viewResourceId = null,
+                    actions = listOf(AccessibilityNodeInfo.ACTION_SET_TEXT),
+                )
+
+                if (findNode(testNode)) {
+                    performAction(testNode)
+                    Success(Unit)
+                } else {
+                    val sendNode = AccessibilityNodeModel(
+                        packageName = "com.google.android.apps.bard",
+                        contentDescription = "Send",
+                        isFocused = false,
+                        text = null,
+                        textSelectionStart = 0,
+                        textSelectionEnd = 0,
+                        isEditable = false,
+                        className = "android.widget.Button",
+                        uniqueId = null,
+                        viewResourceId = "com.google.android.apps.bard:id/send_button",
+                        actions = listOf(AccessibilityNodeInfo.ACTION_CLICK),
+                    )
+                    if (findNode(sendNode)) {
+                        performAction(sendNode)
+                        Success(Unit)
+                    } else {
+                        KMError.FailedToFindAccessibilityNode
+                    }
+                }
+            }
+
+            val action = ActionData.GeminiPrompt(prompt = "Fallback test")
+            useCase.perform(action)
+            testScheduler.advanceUntilIdle()
+
+            verify(mockAccessibilityService, atLeastOnce()).performActionOnNode(any(), any())
         }
 }

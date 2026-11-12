@@ -29,6 +29,18 @@
       of the app is 26.-->
     <uses-sdk tools:overrideLibrary="io.github.sds100.keymapper.sysbridge, io.github.sds100.keymapper.evdev" />
 
+    <queries>
+        <package android:name="com.google.android.apps.bard" />
+        <package android:name="com.google.android.googlequicksearchbox" />
+        <package android:name="com.samsung.android.bixby.agent" />
+        <intent>
+            <action android:name="android.intent.action.VOICE_COMMAND" />
+        </intent>
+        <intent>
+            <action android:name="android.intent.action.ASSIST" />
+        </intent>
+    </queries>
+
     <application
         android:name="io.github.sds100.keymapper.KeyMapperApp"
         android:allowBackup="true"

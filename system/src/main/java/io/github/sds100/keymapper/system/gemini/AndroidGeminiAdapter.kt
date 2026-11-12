@@ -1,6 +1,8 @@
 package io.github.sds100.keymapper.system.gemini
 
 import android.app.SearchManager
+import android.content.ClipData
+import android.content.ClipboardManager
 import android.content.Context
 import android.content.Intent
 import android.os.Handler
@@ -150,7 +152,25 @@ class AndroidGeminiAdapter @Inject constructor(@ApplicationContext private val c
         }
     }
 
+    private fun copyPromptToClipboard(prompt: String) {
+        try {
+            val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as? ClipboardManager
+            val clip = ClipData.newPlainText("Gemini Prompt", prompt)
+            clipboard?.setPrimaryClip(clip)
+            try {
+                Handler(Looper.getMainLooper()).post {
+                    Toast.makeText(context, "Copied prompt to clipboard", Toast.LENGTH_SHORT).show()
+                }
+            } catch (t: Throwable) {
+                Timber.d(t, "Could not show clipboard toast")
+            }
+        } catch (e: Exception) {
+            Timber.e(e, "Failed to copy prompt to clipboard")
+        }
+    }
+
     internal fun dispatchAssistantIntent(prompt: String): KMResult<String> {
+        copyPromptToClipboard(prompt)
         val voiceIntent = Intent(Intent.ACTION_VOICE_COMMAND).apply {
             putExtra(SearchManager.QUERY, prompt)
             putExtra("query", prompt)
